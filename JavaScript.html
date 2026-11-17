@@ -1,0 +1,642 @@
+
+<script>
+function showPage(page, button) {
+  const titles = {
+    dashboard: "Dashboard",
+    vendors: "Vendor Registration",
+    inspection: "Safety Inspection",
+    history: "Inspection History"
+    
+  };
+
+  document.getElementById("page-title").textContent =
+    titles[page] || "Dashboard";
+
+  document.querySelectorAll(".menu-item").forEach(item => {
+    item.classList.remove("active");
+  });
+
+  if (button) button.classList.add("active");
+
+  if (page === "dashboard") {
+    renderDashboard();
+  } else if (page === "vendors") {
+  renderVendorPage();
+} else if (page === "inspection") {
+  renderInspectionPage();
+} else {
+  renderComingSoon(titles[page]);
+}
+
+function renderInspectionPage() {
+  const content = document.getElementById("page-content");
+
+  content.innerHTML = `
+    <div class="welcome">
+      <div>
+        <h1>Safety Inspection</h1>
+        <p>Record and manage contractor safety inspections.</p>
+      </div>
+    </div>
+
+    <div class="content-card">
+      <div class="section-heading">
+        <h3>Inspection Information</h3>
+        <p>ข้อมูลบริษัทและรายละเอียดการตรวจสอบ</p>
+      </div>
+
+      <form id="inspection-form" class="vendor-form">
+
+        <div class="form-group">
+          <label>Company Name <span>*</span></label>
+          <select id="inspection-company" required>
+            <option value="">Loading companies...</option>
+          </select>
+        </div>
+
+        <div id="vendor-info" class="vendor-info">
+          กรุณาเลือกบริษัท
+        </div>
+
+        <div class="inspection-grid">
+
+          <div class="form-group">
+            <label>Inspection Date <span>*</span></label>
+            <input type="date" id="inspection-date" required>
+          </div>
+
+          <div class="form-group">
+            <label>Inspection Period <span>*</span></label>
+            <select id="inspection-period" required>
+              <option value="">Select Period</option>
+              <option value="Morning">Morning / ช่วงเช้า</option>
+              <option value="Afternoon">Afternoon / ช่วงบ่าย</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Check-in Time <span>*</span></label>
+            <input type="time" id="check-in" required>
+          </div>
+
+          <div class="form-group">
+            <label>Check-out Time</label>
+            <input type="time" id="check-out">
+          </div>
+
+        </div>
+
+        <div class="form-group">
+          <label>Inspection Result <span>*</span></label>
+          <select id="inspection-result" required>
+            <option value="">Select Result</option>
+            <option value="ผ่าน">ผ่าน (Pass)</option>
+            <option value="ต้องปรับปรุง">ต้องปรับปรุง (Needs Improvement)</option>
+            <option value="ไม่ผ่าน">ไม่ผ่าน (Fail)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Remarks / รายละเอียดเพิ่มเติม</label>
+          <textarea id="inspection-remarks"
+            rows="4"
+            placeholder="Enter inspection remarks..."></textarea>
+        </div>
+
+        <div class="upload-section">
+          <h3>Inspection Evidence</h3>
+          <p>แนบรูปภาพและเอกสารประกอบการตรวจสอบ</p>
+
+          <div class="upload-grid">
+
+            <div class="upload-card">
+              <label>Before Photos</label>
+              <p>ภาพก่อนดำเนินการ</p>
+              <input type="file"
+                id="before-files"
+                data-file-type="Before"
+                accept="image/jpeg,image/png,image/webp"
+                multiple>
+            </div>
+
+            <div class="upload-card">
+              <label>After Photos</label>
+              <p>ภาพหลังดำเนินการ</p>
+              <input type="file"
+                id="after-files"
+                data-file-type="After"
+                accept="image/jpeg,image/png,image/webp"
+                multiple>
+            </div>
+
+            <div class="upload-card upload-full">
+              <label>Work Permit Documents</label>
+              <p>เอกสารใบอนุญาตทำงาน</p>
+              <input type="file"
+                id="permit-files"
+                data-file-type="Work Permit"
+                accept=".pdf,.doc,.docx,image/jpeg,image/png"
+                multiple>
+            </div>
+
+          </div>
+
+          <p class="field-hint">
+            รองรับ JPG, PNG, WEBP, PDF, DOC และ DOCX
+            ขนาดไม่เกิน 5 MB ต่อไฟล์
+          </p>
+        </div>
+
+        <div id="inspection-message" class="form-message"></div>
+
+        <button type="submit" class="primary-button"
+          id="save-inspection-button">
+          Save Inspection
+        </button>
+
+      </form>
+    </div>
+  `;
+
+  setTodayForInspection();
+
+  document.getElementById("inspection-company")
+    .addEventListener("change", showSelectedVendor);
+
+  document.getElementById("inspection-form")
+    .addEventListener("submit", submitInspectionForm);
+
+  loadInspectionCompanies();
+}
+
+
+function setTodayForInspection() {
+  const now = new Date();
+  const localDate = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0")
+  ].join("-");
+
+  document.getElementById("inspection-date").value = localDate;
+}
+
+
+function loadInspectionCompanies() {
+  google.script.run
+    .withSuccessHandler(vendors => {
+      const select = document.getElementById("inspection-company");
+
+      select.innerHTML = `
+        <option value="">Select Company</option>
+        ${vendors.map(vendor => `
+          <option value="${escapeHtml(vendor.companyName)}">
+            ${escapeHtml(vendor.companyName)}
+          </option>
+        `).join("")}
+      `;
+
+      window.inspectionVendors = vendors;
+
+      if (vendors.length === 0) {
+        select.innerHTML =
+          '<option value="">No registered companies</option>';
+      }
+    })
+    .withFailureHandler(error => {
+      showInspectionMessage(error.message, "error");
+    })
+    .getInspectionFormData();
+}
+
+
+function showSelectedVendor() {
+  const companyName =
+    document.getElementById("inspection-company").value;
+
+  const vendor = (window.inspectionVendors || [])
+    .find(item => item.companyName === companyName);
+
+  const info = document.getElementById("vendor-info");
+
+  if (!vendor) {
+    info.innerHTML = "กรุณาเลือกบริษัท";
+    return;
+  }
+
+  info.innerHTML = `
+    <div><strong>Work Location:</strong>
+      ${escapeHtml(vendor.workLocation)}</div>
+    <div><strong>Work Types:</strong>
+      ${(vendor.workTypes || []).map(type =>
+        `<span class="type-tag">${escapeHtml(type)}</span>`
+      ).join(" ")}</div>
+  `;
+}
+
+
+function readInspectionFile(file, fileType) {
+  return new Promise((resolve, reject) => {
+    if (file.size > 5 * 1024 * 1024) {
+      reject(new Error(file.name + " มีขนาดเกิน 5 MB"));
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      resolve({
+        name: file.name,
+        mimeType: file.type,
+        fileType: fileType,
+        data: reader.result
+      });
+    };
+
+    reader.onerror = () => {
+      reject(new Error("ไม่สามารถอ่านไฟล์ " + file.name));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+
+async function submitInspectionForm(event) {
+  event.preventDefault();
+
+  const button =
+    document.getElementById("save-inspection-button");
+
+  button.disabled = true;
+  button.textContent = "Saving...";
+
+  try {
+    const files = [];
+
+    const fileGroups = [
+      { id: "before-files", type: "Before" },
+      { id: "after-files", type: "After" },
+      { id: "permit-files", type: "Work Permit" }
+    ];
+
+    for (const group of fileGroups) {
+      const selected = Array.from(
+        document.getElementById(group.id).files
+      );
+
+      for (const file of selected) {
+        files.push(
+          await readInspectionFile(file, group.type)
+        );
+      }
+    }
+
+    const formData = {
+      companyName:
+        document.getElementById("inspection-company").value,
+
+      inspectionDate:
+        document.getElementById("inspection-date").value,
+
+      period:
+        document.getElementById("inspection-period").value,
+
+      checkIn:
+        document.getElementById("check-in").value,
+
+      checkOut:
+        document.getElementById("check-out").value,
+
+      result:
+        document.getElementById("inspection-result").value,
+
+      remarks:
+        document.getElementById("inspection-remarks").value,
+
+      files: files
+    };
+
+    google.script.run
+      .withSuccessHandler(result => {
+        showInspectionMessage(
+          result.message + " แนบไฟล์ " + result.fileCount + " ไฟล์",
+          "success"
+        );
+
+        document.getElementById("inspection-form").reset();
+        setTodayForInspection();
+
+        document.getElementById("vendor-info").innerHTML =
+          "กรุณาเลือกบริษัท";
+
+        button.disabled = false;
+        button.textContent = "Save Inspection";
+      })
+      .withFailureHandler(error => {
+        showInspectionMessage(error.message, "error");
+        button.disabled = false;
+        button.textContent = "Save Inspection";
+      })
+      .saveInspection(formData);
+
+  } catch (error) {
+    showInspectionMessage(error.message, "error");
+    button.disabled = false;
+    button.textContent = "Save Inspection";
+  }
+}
+
+
+function showInspectionMessage(message, type) {
+  const box = document.getElementById("inspection-message");
+
+  if (!box) return;
+
+  box.textContent = message;
+  box.className = "form-message " + type;
+}
+
+    renderComingSoon(titles[page]);
+  }
+}
+
+
+function renderDashboard() {
+  document.getElementById("page-content").innerHTML = `
+    <div class="welcome">
+      <div>
+        <h1>Vendor Safety Dashboard</h1>
+        <p>Monitor and manage contractor safety inspections.</p>
+      </div>
+      <div class="date-box">
+        <label>Select Inspection Date</label>
+        <input type="date" id="dashboard-date">
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <span>COMPANIES INSPECTED</span>
+        <h2>0</h2>
+        <small>Unique companies today</small>
+      </div>
+      <div class="kpi-card">
+        <span>TOTAL INSPECTIONS</span>
+        <h2>0</h2>
+        <small>Inspection records</small>
+      </div>
+      <div class="kpi-card">
+        <span>MORNING INSPECTIONS</span>
+        <h2>0</h2>
+        <small>Morning period</small>
+      </div>
+      <div class="kpi-card">
+        <span>AFTERNOON INSPECTIONS</span>
+        <h2>0</h2>
+        <small>Afternoon period</small>
+      </div>
+    </div>
+
+    <div class="content-card">
+      <div class="section-heading">
+        <h3>Daily Inspection Records</h3>
+        <p>รายการตรวจสอบผู้รับเหมาตามวันที่เลือก</p>
+      </div>
+      <div class="empty-state">
+        <div class="empty-icon">▤</div>
+        <h3>No Inspection Data</h3>
+        <p>Inspection records will appear here.</p>
+      </div>
+    </div>
+  `;
+}
+
+
+function renderVendorPage() {
+  const content = document.getElementById("page-content");
+
+  content.innerHTML = `
+    <div class="welcome">
+      <div>
+        <h1>Vendor Registration</h1>
+        <p>Register and manage contractor companies.</p>
+      </div>
+      <div class="vendor-count" id="vendor-count">
+        Loading...
+      </div>
+    </div>
+
+    <div class="vendor-layout">
+
+      <div class="content-card">
+        <div class="section-heading">
+          <h3>Register New Vendor</h3>
+          <p>กรอกข้อมูลบริษัทผู้รับเหมา</p>
+        </div>
+
+        <form id="vendor-form" class="vendor-form">
+
+          <div class="form-group">
+            <label>Company Name <span>*</span></label>
+            <input
+              type="text"
+              id="company-name"
+              placeholder="Enter company name"
+              required>
+          </div>
+
+          <div class="form-group">
+            <label>Work Location <span>*</span></label>
+            <input
+              type="text"
+              id="work-location"
+              placeholder="Enter work location"
+              required>
+          </div>
+
+          <div class="form-group">
+            <label>Work Types <span>*</span></label>
+            <p class="field-hint">
+              Select all work types that apply.
+            </p>
+            <div id="work-type-list" class="work-type-list">
+              <p class="loading-text">Loading work types...</p>
+            </div>
+          </div>
+
+          <div id="vendor-message" class="form-message"></div>
+
+          <button type="submit" class="primary-button"
+            id="save-vendor-button">
+            Save Vendor
+          </button>
+
+        </form>
+      </div>
+
+      <div class="content-card">
+        <div class="section-heading">
+          <h3>Registered Vendors</h3>
+          <p>รายชื่อบริษัทที่ลงทะเบียนแล้ว</p>
+        </div>
+
+        <div class="vendor-table-wrap">
+          <table class="vendor-table">
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Work Location</th>
+                <th>Work Types</th>
+              </tr>
+            </thead>
+            <tbody id="vendor-table-body">
+              <tr>
+                <td colspan="3">Loading vendors...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  `;
+
+  document.getElementById("vendor-form")
+    .addEventListener("submit", submitVendorForm);
+
+  loadVendorPageData();
+}
+
+
+function loadVendorPageData() {
+  google.script.run
+    .withSuccessHandler(data => {
+      renderWorkTypes(data.workTypes);
+      renderVendorList(data.vendors);
+    })
+    .withFailureHandler(error => {
+      showVendorMessage(error.message, "error");
+      document.getElementById("vendor-table-body").innerHTML =
+        `<tr><td colspan="3">Unable to load data.</td></tr>`;
+    })
+    .getVendorPageData();
+}
+
+
+function renderWorkTypes(workTypes) {
+  const container = document.getElementById("work-type-list");
+
+  if (!workTypes || workTypes.length === 0) {
+    container.innerHTML = "<p>No work types available.</p>";
+    return;
+  }
+
+  container.innerHTML = workTypes.map((type, index) => `
+    <label class="work-type-option">
+      <input type="checkbox" name="work-type"
+        value="${escapeHtml(type)}">
+      <span>${escapeHtml(type)}</span>
+    </label>
+  `).join("");
+}
+
+
+function renderVendorList(vendors) {
+  const tbody = document.getElementById("vendor-table-body");
+  const count = document.getElementById("vendor-count");
+
+  count.textContent = `${vendors.length} Registered Companies`;
+
+  if (!vendors.length) {
+    tbody.innerHTML = `
+      <tr><td colspan="3">No registered vendors yet.</td></tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = vendors.map(vendor => `
+    <tr>
+      <td><strong>${escapeHtml(vendor.companyName)}</strong></td>
+      <td>${escapeHtml(vendor.workLocation)}</td>
+      <td>
+        ${(vendor.workTypes || []).map(type =>
+          `<span class="type-tag">${escapeHtml(type)}</span>`
+        ).join(" ")}
+      </td>
+    </tr>
+  `).join("");
+}
+
+
+function submitVendorForm(event) {
+  event.preventDefault();
+
+  const button = document.getElementById("save-vendor-button");
+  const selectedTypes = Array.from(
+    document.querySelectorAll('input[name="work-type"]:checked')
+  ).map(input => input.value);
+
+  const formData = {
+    companyName: document.getElementById("company-name").value,
+    workLocation: document.getElementById("work-location").value,
+    workTypes: selectedTypes
+  };
+
+  if (selectedTypes.length === 0) {
+    showVendorMessage("กรุณาเลือกประเภทงานอย่างน้อย 1 ประเภท", "error");
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Saving...";
+
+  google.script.run
+    .withSuccessHandler(result => {
+      showVendorMessage(result.message, "success");
+      document.getElementById("vendor-form").reset();
+      loadVendorPageData();
+      button.disabled = false;
+      button.textContent = "Save Vendor";
+    })
+    .withFailureHandler(error => {
+      showVendorMessage(error.message, "error");
+      button.disabled = false;
+      button.textContent = "Save Vendor";
+    })
+    .saveVendor(formData);
+}
+
+
+function showVendorMessage(message, type) {
+  const box = document.getElementById("vendor-message");
+
+  if (!box) return;
+
+  box.textContent = message;
+  box.className = "form-message " + type;
+}
+
+
+function renderComingSoon(title) {
+  document.getElementById("page-content").innerHTML = `
+    <div class="content-card">
+      <h3>${escapeHtml(title)}</h3>
+      <p style="color:#A7B0B8">
+        This module will be developed in the next step.
+      </p>
+    </div>
+  `;
+}
+
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
+</script>
