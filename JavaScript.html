@@ -1,34 +1,591 @@
-
 <script>
-function showPage(page, button) {
-  const titles = {
-    dashboard: "Dashboard",
-    vendors: "Vendor Registration",
-    inspection: "Safety Inspection",
-    history: "Inspection History"
-  };
+// ========================================================
+// 1. Multi-language (i18n) Engine
+// ========================================================
+const i18n = {
+  th: {
+    menu_dashboard: "แดชบอร์ด",
+    menu_vendors: "ทะเบียนผู้รับเหมา",
+    menu_inspection: "บันทึกการตรวจความปลอดภัย",
+    menu_history: "ประวัติการตรวจสอบ",
+    menu_permits: "ใบอนุญาตทำงาน (Work Permit)",
+    menu_documents: "ศูนย์รวมเอกสาร",
+    menu_archives: "คลังประวัติหน่วยงาน",
+    system_ready: "ระบบพร้อมใช้งาน (v2.0)",
+    subtitle_main: "ระบบบริหารจัดการความปลอดภัยผู้รับเหมา",
+    online: "ออนไลน์",
+    loading: "กำลังโหลดข้อมูล...",
+    save: "บันทึกข้อมูล",
+    saving: "กำลังบันทึก...",
+    cancel: "ยกเลิก",
+    close: "ปิดหน้าต่าง",
+    search_placeholder: "พิมพ์คำค้นหา (ชื่อบริษัท, สถานที่, ฯลฯ)...",
+    filter_all: "ทั้งหมด",
+    status_active: "เปิดใช้งาน",
+    status_inactive: "ระงับการใช้งาน",
+    status_pass: "ผ่าน",
+    status_improve: "ต้องปรับปรุง",
+    status_fail: "ไม่ผ่าน",
+    kpi_companies: "บริษัทที่ได้รับการตรวจ",
+    kpi_total: "จำนวนการตรวจทั้งหมด",
+    kpi_morning: "ตรวจช่วงเช้า",
+    kpi_afternoon: "ตรวจช่วงบ่าย",
+    select_company: "เลือกบริษัท",
+    select_period: "เลือกช่วงเวลา",
+    select_result: "เลือกผลการตรวจ",
+    evidence_section: "หลักฐานภาพถ่ายและเอกสาร",
+    no_data: "ไม่พบข้อมูลในระบบ"
+  },
+  en: {
+    menu_dashboard: "Dashboard",
+    menu_vendors: "Vendor Registration",
+    menu_inspection: "Safety Inspection",
+    menu_history: "Inspection History",
+    menu_permits: "Work Permit",
+    menu_documents: "Document Management",
+    menu_archives: "Department Archives",
+    system_ready: "System Ready (v2.0)",
+    subtitle_main: "Vendor Safety Management System",
+    online: "Online",
+    loading: "Loading data...",
+    save: "Save",
+    saving: "Saving...",
+    cancel: "Cancel",
+    close: "Close",
+    search_placeholder: "Search (Company name, location, etc.)...",
+    filter_all: "All",
+    status_active: "Active",
+    status_inactive: "Inactive",
+    status_pass: "Pass",
+    status_improve: "Needs Improvement",
+    status_fail: "Fail",
+    kpi_companies: "Companies Inspected",
+    kpi_total: "Total Inspections",
+    kpi_morning: "Morning Period",
+    kpi_afternoon: "Afternoon Period",
+    select_company: "Select Company",
+    select_period: "Select Period",
+    select_result: "Select Result",
+    evidence_section: "Inspection Evidence & Files",
+    no_data: "No records found"
+  }
+};
 
-  document.getElementById("page-title").textContent =
-    titles[page] || "Dashboard";
+let currentLang = localStorage.getItem("vendor_safety_lang") || "th";
 
-  document.querySelectorAll(".menu-item").forEach(item => {
-    item.classList.remove("active");
+function t(key) {
+  return (i18n[currentLang] && i18n[currentLang][key]) || (i18n.en && i18n.en[key]) || key;
+}
+
+function setLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem("vendor_safety_lang", lang);
+
+  document.querySelectorAll(".lang-btn").forEach(btn => btn.classList.remove("active"));
+  const activeBtn = document.getElementById("lang-" + lang);
+  if (activeBtn) activeBtn.classList.add("active");
+
+  // Update static UI elements
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.getAttribute("data-i18n");
+    el.textContent = t(key);
   });
 
-  if (button) button.classList.add("active");
-
-  if (page === "dashboard") {
-    renderDashboard();
-  } else if (page === "vendors") {
-    renderVendorPage();
-  } else if (page === "inspection") {
-    renderInspectionPage();
-  } else {
-    renderComingSoon(titles[page]);
+  // Re-render current page
+  if (window.currentPageName) {
+    showPage(window.currentPageName, null, true);
   }
 }
 
-// Global state for selected files in inspection module
+// Mobile Sidebar
+function toggleMobileSidebar(open) {
+  const sidebar = document.getElementById("app-sidebar");
+  const backdrop = document.getElementById("sidebar-backdrop");
+  if (open) {
+    sidebar.classList.add("open");
+    backdrop.classList.add("active");
+  } else {
+    sidebar.classList.remove("open");
+    backdrop.classList.remove("active");
+  }
+}
+
+// ========================================================
+// 2. SPA Router
+// ========================================================
+function showPage(page, button, isLangChange) {
+  window.currentPageName = page;
+  toggleMobileSidebar(false);
+
+  const titles = {
+    dashboard: t("menu_dashboard"),
+    vendors: t("menu_vendors"),
+    inspection: t("menu_inspection"),
+    history: t("menu_history"),
+    permits: t("menu_permits"),
+    documents: t("menu_documents"),
+    archives: t("menu_archives")
+  };
+
+  document.getElementById("page-title").textContent = titles[page] || "Dashboard";
+
+  if (!isLangChange) {
+    document.querySelectorAll(".menu-item").forEach(item => item.classList.remove("active"));
+    const navBtn = button || document.getElementById("nav-" + page);
+    if (navBtn) navBtn.classList.add("active");
+  }
+
+  if (page === "dashboard") renderDashboard();
+  else if (page === "vendors") renderVendorPage();
+  else if (page === "inspection") renderInspectionPage();
+  else if (page === "history") renderHistoryPage();
+  else if (page === "permits") renderPermitsPage();
+  else if (page === "documents") renderDocumentsPage();
+  else if (page === "archives") renderArchivesPage();
+}
+
+// ========================================================
+// 3. Module: Dashboard
+// ========================================================
+function renderDashboard() {
+  const content = document.getElementById("page-content");
+  const now = new Date();
+  const todayStr = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0")
+  ].join("-");
+
+  content.innerHTML = `
+    <div class="welcome">
+      <div>
+        <h1>${t("menu_dashboard")}</h1>
+        <p>${t("subtitle_main")}</p>
+      </div>
+      <div class="date-box">
+        <label>${currentLang === 'th' ? 'เลือกวันที่ตรวจ' : 'Inspection Date'}</label>
+        <input type="date" id="dashboard-date" value="${todayStr}">
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <span>${t("kpi_companies")}</span>
+        <h2 id="kpi-companies">-</h2>
+        <small>${currentLang === 'th' ? 'บริษัทที่ผ่านการตรวจวันนี้' : 'Companies today'}</small>
+      </div>
+      <div class="kpi-card">
+        <span>${t("kpi_total")}</span>
+        <h2 id="kpi-total">-</h2>
+        <small>${currentLang === 'th' ? 'บันทึกการตรวจทั้งหมด' : 'Total records'}</small>
+      </div>
+      <div class="kpi-card">
+        <span>${t("kpi_morning")}</span>
+        <h2 id="kpi-morning">-</h2>
+        <small>${currentLang === 'th' ? 'รอบช่วงเช้า' : 'Morning records'}</small>
+      </div>
+      <div class="kpi-card">
+        <span>${t("kpi_afternoon")}</span>
+        <h2 id="kpi-afternoon">-</h2>
+        <small>${currentLang === 'th' ? 'รอบช่วงบ่าย' : 'Afternoon records'}</small>
+      </div>
+    </div>
+
+    <div class="content-card">
+      <div class="section-heading" style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3>${currentLang === 'th' ? 'รายการตรวจสอบประจำวัน' : 'Daily Inspection Records'}</h3>
+          <p>${currentLang === 'th' ? 'รายการผลการตรวจสอบผู้รับเหมาตามวันที่เลือก' : 'Inspections on the selected date'}</p>
+        </div>
+        <button class="primary-button" style="padding:8px 16px; font-size:12px;" onclick="showPage('inspection')">
+          + ${currentLang === 'th' ? 'ตรวจความปลอดภัยใหม่' : 'New Inspection'}
+        </button>
+      </div>
+
+      <div id="dashboard-table-wrap" class="vendor-table-wrap">
+        <p class="loading-text">${t("loading")}</p>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("dashboard-date").addEventListener("change", e => {
+    loadDashboardData(e.target.value);
+  });
+
+  loadDashboardData(todayStr);
+}
+
+function loadDashboardData(dateStr) {
+  google.script.run
+    .withSuccessHandler(data => {
+      document.getElementById("kpi-companies").textContent = data.companiesInspected;
+      document.getElementById("kpi-total").textContent = data.totalInspections;
+      document.getElementById("kpi-morning").textContent = data.morningCount;
+      document.getElementById("kpi-afternoon").textContent = data.afternoonCount;
+
+      const wrap = document.getElementById("dashboard-table-wrap");
+      if (!data.records || data.records.length === 0) {
+        wrap.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">▤</div>
+            <h3>${t("no_data")}</h3>
+            <p>${currentLang === 'th' ? 'ยังไม่มีรายการตรวจในวันที่เลือก' : 'No records for this date.'}</p>
+          </div>
+        `;
+        return;
+      }
+
+      wrap.innerHTML = `
+        <table class="vendor-table">
+          <thead>
+            <tr>
+              <th>${currentLang === 'th' ? 'ชื่อบริษัท' : 'Company'}</th>
+              <th>${currentLang === 'th' ? 'ช่วงเวลา' : 'Period'}</th>
+              <th>${currentLang === 'th' ? 'เวลาเข้า-ออก' : 'Check-in / Out'}</th>
+              <th>${currentLang === 'th' ? 'ผลการตรวจ' : 'Result'}</th>
+              <th>${currentLang === 'th' ? 'หมายเหตุ' : 'Remarks'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.records.map(r => `
+              <tr>
+                <td><strong>${escapeHtml(r.companyName)}</strong></td>
+                <td><span class="type-tag">${escapeHtml(r.period)}</span></td>
+                <td>${escapeHtml(r.checkIn)} - ${escapeHtml(r.checkOut)}</td>
+                <td>${renderResultBadge(r.result)}</td>
+                <td>${escapeHtml(r.remarks || "-")}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    })
+    .withFailureHandler(err => {
+      const wrap = document.getElementById("dashboard-table-wrap");
+      if (wrap) wrap.innerHTML = `<p class="form-message error">⚠ ${escapeHtml(err.message)}</p>`;
+    })
+    .getDashboardData(dateStr);
+}
+
+// ========================================================
+// 4. Module: Vendor Registration
+// ========================================================
+function renderVendorPage() {
+  const content = document.getElementById("page-content");
+  content.innerHTML = `
+    <div class="welcome">
+      <div>
+        <h1>${t("menu_vendors")}</h1>
+        <p>${currentLang === 'th' ? 'ลงทะเบียน จัดการ และค้นหาผู้รับเหมา' : 'Register, manage and search contractor companies'}</p>
+      </div>
+      <div class="vendor-count" id="vendor-count">${t("loading")}</div>
+    </div>
+
+    <div class="vendor-layout">
+      <!-- Registration Form -->
+      <div class="content-card">
+        <div class="section-heading">
+          <h3>${currentLang === 'th' ? 'ลงทะเบียนบริษัทใหม่' : 'Register New Vendor'}</h3>
+          <p>${currentLang === 'th' ? 'กรอกข้อมูลและเลือกประเภทงานเสี่ยงสูง' : 'Enter company details and high-risk work types'}</p>
+        </div>
+
+        <form id="vendor-form" class="vendor-form">
+          <div class="form-group">
+            <label>${currentLang === 'th' ? 'ชื่อบริษัท' : 'Company Name'} <span>*</span></label>
+            <input type="text" id="company-name" placeholder="Enter company name" required>
+          </div>
+
+          <div class="form-group">
+            <label>${currentLang === 'th' ? 'พื้นที่ปฏิบัติงาน' : 'Work Location'} <span>*</span></label>
+            <input type="text" id="work-location" placeholder="e.g. Building A Fl. 4" required>
+          </div>
+
+          <div class="form-group">
+            <label>${currentLang === 'th' ? 'ประเภทงานความเสี่ยงสูง' : 'High-Risk Work Types'} <span>*</span></label>
+            <div id="work-type-list" class="work-type-list">
+              <p class="loading-text">${t("loading")}</p>
+            </div>
+          </div>
+
+          <div id="vendor-message" class="form-message"></div>
+
+          <button type="submit" class="primary-button" id="save-vendor-button">
+            ${currentLang === 'th' ? 'บันทึกข้อมูลบริษัท' : 'Save Vendor'}
+          </button>
+        </form>
+      </div>
+
+      <!-- Vendors List Table -->
+      <div class="content-card">
+        <div class="section-heading">
+          <h3>${currentLang === 'th' ? 'รายชื่อบริษัทผู้รับเหมา' : 'Registered Vendors'}</h3>
+          <p>${currentLang === 'th' ? 'ค้นหา แก้ไข หรือเปิด/ปิดการใช้งาน' : 'Search, edit, or toggle status'}</p>
+        </div>
+
+        <div class="filter-toolbar">
+          <input type="text" id="vendor-search" class="search-input" placeholder="${t('search_placeholder')}">
+          <select id="vendor-status-filter" class="filter-select">
+            <option value="ALL">${t("filter_all")}</option>
+            <option value="ACTIVE">${t("status_active")}</option>
+            <option value="INACTIVE">${t("status_inactive")}</option>
+          </select>
+        </div>
+
+        <div class="vendor-table-wrap">
+          <table class="vendor-table">
+            <thead>
+              <tr>
+                <th>${currentLang === 'th' ? 'บริษัท' : 'Company'}</th>
+                <th>${currentLang === 'th' ? 'พื้นที่' : 'Location'}</th>
+                <th>${currentLang === 'th' ? 'ประเภทงาน' : 'Work Types'}</th>
+                <th>${currentLang === 'th' ? 'สถานะ' : 'Status'}</th>
+                <th>${currentLang === 'th' ? 'การจัดการ' : 'Action'}</th>
+              </tr>
+            </thead>
+            <tbody id="vendor-table-body">
+              <tr><td colspan="5">${t("loading")}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("vendor-form").addEventListener("submit", submitVendorForm);
+  document.getElementById("vendor-search").addEventListener("input", filterVendorsDisplay);
+  document.getElementById("vendor-status-filter").addEventListener("change", filterVendorsDisplay);
+
+  loadVendorPageData();
+}
+
+function loadVendorPageData() {
+  google.script.run
+    .withSuccessHandler(data => {
+      window.cachedWorkTypes = data.workTypes;
+      window.cachedVendors = data.vendors;
+
+      renderWorkTypesOptions(data.workTypes);
+      filterVendorsDisplay();
+    })
+    .withFailureHandler(err => {
+      showVendorMessage(err.message, "error");
+    })
+    .getVendorPageData();
+}
+
+function renderWorkTypesOptions(types) {
+  const container = document.getElementById("work-type-list");
+  if (!container) return;
+
+  if (!types || types.length === 0) {
+    container.innerHTML = "<p>No work types available.</p>";
+    return;
+  }
+
+  container.innerHTML = types.map(type => `
+    <label class="work-type-option">
+      <input type="checkbox" name="work-type" value="${escapeHtml(type)}">
+      <span>${escapeHtml(type)}</span>
+    </label>
+  `).join("");
+}
+
+function filterVendorsDisplay() {
+  const searchInput = document.getElementById("vendor-search");
+  const statusFilter = document.getElementById("vendor-status-filter");
+  if (!searchInput || !window.cachedVendors) return;
+
+  const query = searchInput.value.toLowerCase().trim();
+  const status = statusFilter.value;
+
+  const filtered = window.cachedVendors.filter(v => {
+    const matchQuery = v.companyName.toLowerCase().includes(query) || v.workLocation.toLowerCase().includes(query);
+    const matchStatus = status === "ALL" || (status === "ACTIVE" && v.isActive) || (status === "INACTIVE" && !v.isActive);
+    return matchQuery && matchStatus;
+  });
+
+  const tbody = document.getElementById("vendor-table-body");
+  const count = document.getElementById("vendor-count");
+  if (count) count.textContent = `${filtered.length} ${currentLang === 'th' ? 'บริษัท' : 'Companies'}`;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--muted);">${t("no_data")}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(v => `
+    <tr>
+      <td><strong>${escapeHtml(v.companyName)}</strong></td>
+      <td>${escapeHtml(v.workLocation)}</td>
+      <td>
+        ${(v.workTypes || []).map(t => `<span class="type-tag">${escapeHtml(t)}</span>`).join(" ")}
+      </td>
+      <td>
+        <span class="badge ${v.isActive ? 'badge-active' : 'badge-inactive'}">
+          ${v.isActive ? t("status_active") : t("status_inactive")}
+        </span>
+      </td>
+      <td>
+        <button class="btn-sm btn-outline" onclick="openEditVendorModal('${escapeHtml(v.companyName)}')">
+          ${currentLang === 'th' ? 'แก้ไข' : 'Edit'}
+        </button>
+        <button class="btn-sm ${v.isActive ? 'btn-danger-outline' : 'btn-success-outline'}"
+          onclick="toggleVendorStatusAction('${escapeHtml(v.companyName)}')">
+          ${v.isActive ? (currentLang === 'th' ? 'ระงับ' : 'Deactivate') : (currentLang === 'th' ? 'เปิดใช้' : 'Activate')}
+        </button>
+      </td>
+    </tr>
+  `).join("");
+}
+
+function submitVendorForm(event) {
+  event.preventDefault();
+  const button = document.getElementById("save-vendor-button");
+  const selectedTypes = Array.from(document.querySelectorAll('input[name="work-type"]:checked')).map(i => i.value);
+
+  if (selectedTypes.length === 0) {
+    showVendorMessage(currentLang === 'th' ? "กรุณาเลือกประเภทงานอย่างน้อย 1 ประเภท" : "Please select at least 1 work type", "error");
+    return;
+  }
+
+  const formData = {
+    companyName: document.getElementById("company-name").value,
+    workLocation: document.getElementById("work-location").value,
+    workTypes: selectedTypes
+  };
+
+  button.disabled = true;
+  button.textContent = t("saving");
+
+  google.script.run
+    .withSuccessHandler(res => {
+      showVendorMessage("✔ " + res.message, "success");
+      document.getElementById("vendor-form").reset();
+      button.disabled = false;
+      button.textContent = currentLang === 'th' ? 'บันทึกข้อมูลบริษัท' : 'Save Vendor';
+      loadVendorPageData();
+    })
+    .withFailureHandler(err => {
+      showVendorMessage("⚠ " + err.message, "error");
+      button.disabled = false;
+      button.textContent = currentLang === 'th' ? 'บันทึกข้อมูลบริษัท' : 'Save Vendor';
+    })
+    .saveVendor(formData);
+}
+
+function toggleVendorStatusAction(companyName) {
+  if (!confirm(currentLang === 'th' ? `คุณต้องการเปลี่ยนสถานะของ ${companyName} หรือไม่?` : `Change status for ${companyName}?`)) return;
+
+  google.script.run
+    .withSuccessHandler(res => {
+      alert("✔ " + res.message);
+      loadVendorPageData();
+    })
+    .withFailureHandler(err => {
+      alert("⚠ " + err.message);
+    })
+    .toggleVendorStatus(companyName);
+}
+
+function openEditVendorModal(companyName) {
+  const vendor = (window.cachedVendors || []).find(v => v.companyName === companyName);
+  if (!vendor) return;
+
+  const allTypes = window.cachedWorkTypes || [];
+
+  const modalHtml = `
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>${currentLang === 'th' ? 'แก้ไขข้อมูลผู้รับเหมา' : 'Edit Vendor Details'}</h3>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="edit-vendor-form">
+          <div class="form-group">
+            <label>${currentLang === 'th' ? 'ชื่อบริษัท' : 'Company Name'}</label>
+            <input type="text" id="edit-vendor-name" value="${escapeHtml(vendor.companyName)}" disabled style="opacity:0.7;">
+          </div>
+          <div class="form-group">
+            <label>${currentLang === 'th' ? 'พื้นที่ปฏิบัติงาน' : 'Work Location'}</label>
+            <input type="text" id="edit-vendor-location" value="${escapeHtml(vendor.workLocation)}" required>
+          </div>
+          <div class="form-group">
+            <label>${currentLang === 'th' ? 'ประเภทงานความเสี่ยงสูง' : 'Work Types'}</label>
+            <div class="work-type-list" style="max-height:180px; overflow-y:auto;">
+              ${allTypes.map(t => {
+                const checked = (vendor.workTypes || []).includes(t) ? 'checked' : '';
+                return `
+                  <label class="work-type-option">
+                    <input type="checkbox" name="edit-work-type" value="${escapeHtml(t)}" ${checked}>
+                    <span>${escapeHtml(t)}</span>
+                  </label>
+                `;
+              }).join("")}
+            </div>
+          </div>
+          <div id="edit-vendor-msg" class="form-message"></div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-sm btn-outline" onclick="closeModal()">${t("cancel")}</button>
+        <button class="btn-sm primary-button" id="save-edit-vendor-btn" onclick="saveEditedVendor()">${t("save")}</button>
+      </div>
+    </div>
+  `;
+
+  openModal(modalHtml);
+}
+
+function saveEditedVendor() {
+  const companyName = document.getElementById("edit-vendor-name").value;
+  const workLocation = document.getElementById("edit-vendor-location").value;
+  const selectedTypes = Array.from(document.querySelectorAll('input[name="edit-work-type"]:checked')).map(i => i.value);
+  const btn = document.getElementById("save-edit-vendor-btn");
+  const msg = document.getElementById("edit-vendor-msg");
+
+  if (!workLocation) {
+    msg.textContent = "กรุณาระบุพื้นที่ปฏิบัติงาน";
+    msg.className = "form-message error";
+    return;
+  }
+  if (selectedTypes.length === 0) {
+    msg.textContent = "กรุณาเลือกประเภทงานอย่างน้อย 1 ประเภท";
+    msg.className = "form-message error";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = t("saving");
+
+  google.script.run
+    .withSuccessHandler(res => {
+      closeModal();
+      alert("✔ " + res.message);
+      loadVendorPageData();
+    })
+    .withFailureHandler(err => {
+      msg.textContent = "⚠ " + err.message;
+      msg.className = "form-message error";
+      btn.disabled = false;
+      btn.textContent = t("save");
+    })
+    .updateVendor({
+      companyName: companyName,
+      workLocation: workLocation,
+      workTypes: selectedTypes
+    });
+}
+
+function showVendorMessage(msg, type) {
+  const box = document.getElementById("vendor-message");
+  if (!box) return;
+  box.textContent = msg;
+  box.className = "form-message " + type;
+}
+
+// ========================================================
+// 5. Module: Safety Inspection (Form)
+// ========================================================
 window.inspectionFileState = {
   Before: [],
   After: [],
@@ -37,73 +594,64 @@ window.inspectionFileState = {
 
 function renderInspectionPage() {
   const content = document.getElementById("page-content");
-
-  // Reset file state on render
-  window.inspectionFileState = {
-    Before: [],
-    After: [],
-    "Work Permit": []
-  };
+  window.inspectionFileState = { Before: [], After: [], "Work Permit": [] };
 
   content.innerHTML = `
     <div class="welcome">
       <div>
-        <h1>Safety Inspection</h1>
-        <p>Record and manage contractor safety inspections.</p>
+        <h1>${t("menu_inspection")}</h1>
+        <p>${currentLang === 'th' ? 'บันทึกการตรวจสอบความปลอดภัยและแนบรูปภาพหลักฐาน' : 'Record safety inspection and attach evidence'}</p>
       </div>
     </div>
 
     <div class="content-card">
       <div class="section-heading">
-        <h3>Inspection Information</h3>
-        <p>ข้อมูลบริษัทและรายละเอียดการตรวจสอบ</p>
+        <h3>${currentLang === 'th' ? 'ข้อมูลการตรวจสอบ' : 'Inspection Information'}</h3>
+        <p>${currentLang === 'th' ? 'ข้อมูลบริษัทและรายละเอียดการตรวจสอบ' : 'Company info and inspection details'}</p>
       </div>
 
       <form id="inspection-form" class="vendor-form">
-
         <div class="form-group">
-          <label>Company Name <span>*</span></label>
+          <label>${currentLang === 'th' ? 'ชื่อบริษัท' : 'Company Name'} <span>*</span></label>
           <select id="inspection-company" required>
-            <option value="">Loading companies...</option>
+            <option value="">${t("loading")}</option>
           </select>
         </div>
 
         <div id="vendor-info" class="vendor-info">
-          กรุณาเลือกบริษัท
+          ${currentLang === 'th' ? 'กรุณาเลือกบริษัท' : 'Please select a company'}
         </div>
 
         <div class="inspection-grid">
-
           <div class="form-group">
-            <label>Inspection Date <span>*</span></label>
+            <label>${currentLang === 'th' ? 'วันที่ตรวจ' : 'Inspection Date'} <span>*</span></label>
             <input type="date" id="inspection-date" required>
           </div>
 
           <div class="form-group">
-            <label>Inspection Period <span>*</span></label>
+            <label>${currentLang === 'th' ? 'ช่วงเวลา' : 'Period'} <span>*</span></label>
             <select id="inspection-period" required>
-              <option value="">Select Period</option>
+              <option value="">${t("select_period")}</option>
               <option value="Morning">Morning / ช่วงเช้า</option>
               <option value="Afternoon">Afternoon / ช่วงบ่าย</option>
             </select>
           </div>
 
           <div class="form-group">
-            <label>Check-in Time <span>*</span></label>
+            <label>${currentLang === 'th' ? 'เวลาเข้าตรวจ' : 'Check-in Time'} <span>*</span></label>
             <input type="time" id="check-in" required>
           </div>
 
           <div class="form-group">
-            <label>Check-out Time</label>
+            <label>${currentLang === 'th' ? 'เวลาออกตรวจ' : 'Check-out Time'}</label>
             <input type="time" id="check-out">
           </div>
-
         </div>
 
         <div class="form-group">
-          <label>Inspection Result <span>*</span></label>
+          <label>${currentLang === 'th' ? 'ผลการตรวจ' : 'Inspection Result'} <span>*</span></label>
           <select id="inspection-result" required>
-            <option value="">Select Result</option>
+            <option value="">${t("select_result")}</option>
             <option value="ผ่าน">ผ่าน (Pass)</option>
             <option value="ต้องปรับปรุง">ต้องปรับปรุง (Needs Improvement)</option>
             <option value="ไม่ผ่าน">ไม่ผ่าน (Fail)</option>
@@ -111,78 +659,53 @@ function renderInspectionPage() {
         </div>
 
         <div class="form-group">
-          <label>Remarks / รายละเอียดเพิ่มเติม</label>
-          <textarea id="inspection-remarks"
-            rows="4"
-            placeholder="Enter inspection remarks..."></textarea>
+          <label>${currentLang === 'th' ? 'รายละเอียดเพิ่มเติม / หมายเหตุ' : 'Remarks / Additional Notes'}</label>
+          <textarea id="inspection-remarks" rows="3" placeholder="Enter remarks..."></textarea>
         </div>
 
         <div class="upload-section">
-          <h3>Inspection Evidence</h3>
-          <p>แนบรูปภาพและเอกสารประกอบการตรวจสอบ (รองรับการถ่ายภาพจากมือถือ)</p>
+          <h3>${t("evidence_section")}</h3>
+          <p>${currentLang === 'th' ? 'แนบรูปภาพและเอกสารประกอบ (รองรับการถ่ายภาพจากสมาร์ตโฟนโดยตรง)' : 'Attach photos and documents (Supports mobile camera)'}</p>
 
           <div class="upload-grid">
-
             <div class="upload-card">
-              <label>Before Photos</label>
-              <p>ภาพก่อนดำเนินการ</p>
-              <input type="file"
-                id="before-files"
-                data-file-type="Before"
-                accept="image/jpeg,image/png,image/webp,image/*"
-                multiple>
+              <label>${currentLang === 'th' ? 'ภาพก่อนดำเนินการ (Before)' : 'Before Photos'}</label>
+              <p>${currentLang === 'th' ? 'ภาพถ่ายหน้างานก่อนเริ่มงาน' : 'Photos before work starts'}</p>
+              <input type="file" id="before-files" accept="image/*" multiple>
               <div id="before-preview" class="file-preview-list"></div>
             </div>
 
             <div class="upload-card">
-              <label>After Photos</label>
-              <p>ภาพหลังดำเนินการ</p>
-              <input type="file"
-                id="after-files"
-                data-file-type="After"
-                accept="image/jpeg,image/png,image/webp,image/*"
-                multiple>
+              <label>${currentLang === 'th' ? 'ภาพหลังดำเนินการ (After)' : 'After Photos'}</label>
+              <p>${currentLang === 'th' ? 'ภาพถ่ายหน้างานหลังเสร็จสิ้น' : 'Photos after work finishes'}</p>
+              <input type="file" id="after-files" accept="image/*" multiple>
               <div id="after-preview" class="file-preview-list"></div>
             </div>
 
             <div class="upload-card upload-full">
-              <label>Work Permit Documents</label>
-              <p>เอกสารใบอนุญาตทำงาน</p>
-              <input type="file"
-                id="permit-files"
-                data-file-type="Work Permit"
-                accept=".pdf,.doc,.docx,image/jpeg,image/png"
-                multiple>
+              <label>${currentLang === 'th' ? 'เอกสารใบอนุญาตทำงาน (Work Permit)' : 'Work Permit Documents'}</label>
+              <p>${currentLang === 'th' ? 'ไฟล์ PDF หรือเอกสาร Word ใบอนุญาต' : 'PDF or Word permit documents'}</p>
+              <input type="file" id="permit-files" accept=".pdf,.doc,.docx,image/*" multiple>
               <div id="permit-preview" class="file-preview-list"></div>
             </div>
-
           </div>
-
-          <p class="field-hint">
-            รองรับ JPG, PNG, WEBP, PDF, DOC และ DOCX ขนาดไม่เกิน 5 MB ต่อไฟล์
-          </p>
+          <p class="field-hint">JPG, PNG, WEBP, PDF, DOC, DOCX (&le; 5 MB / file)</p>
         </div>
 
         <div id="inspection-message" class="form-message"></div>
 
-        <button type="submit" class="primary-button"
-          id="save-inspection-button">
-          Save Inspection
+        <button type="submit" class="primary-button" id="save-inspection-button">
+          ${currentLang === 'th' ? 'บันทึกการตรวจสอบ' : 'Save Inspection'}
         </button>
-
       </form>
     </div>
   `;
 
   setTodayForInspection();
 
-  document.getElementById("inspection-company")
-    .addEventListener("change", showSelectedVendor);
+  document.getElementById("inspection-company").addEventListener("change", showSelectedVendor);
+  document.getElementById("inspection-form").addEventListener("submit", submitInspectionForm);
 
-  document.getElementById("inspection-form")
-    .addEventListener("submit", submitInspectionForm);
-
-  // Setup file input listeners
   setupFileInputHandler("before-files", "Before", "before-preview");
   setupFileInputHandler("after-files", "After", "after-preview");
   setupFileInputHandler("permit-files", "Work Permit", "permit-preview");
@@ -196,19 +719,13 @@ function setupFileInputHandler(inputId, fileType, previewId) {
 
   input.addEventListener("change", event => {
     const files = Array.from(event.target.files);
-    const validFiles = [];
-
     for (const file of files) {
       if (file.size > 5 * 1024 * 1024) {
         showInspectionMessage(`ไฟล์ ${file.name} มีขนาดเกิน 5 MB`, "error");
         continue;
       }
-      validFiles.push(file);
+      window.inspectionFileState[fileType].push(file);
     }
-
-    // Append to file state
-    window.inspectionFileState[fileType].push(...validFiles);
-    // Reset file input value so user can select same file again if needed
     input.value = "";
     renderFilePreview(fileType, previewId);
   });
@@ -217,8 +734,8 @@ function setupFileInputHandler(inputId, fileType, previewId) {
 function renderFilePreview(fileType, previewId) {
   const container = document.getElementById(previewId);
   if (!container) return;
-
   const files = window.inspectionFileState[fileType] || [];
+
   if (files.length === 0) {
     container.innerHTML = "";
     return;
@@ -226,14 +743,10 @@ function renderFilePreview(fileType, previewId) {
 
   container.innerHTML = files.map((file, idx) => `
     <div class="file-preview-item">
-      <div class="file-name" title="${escapeHtml(file.name)}">
-        📄 ${escapeHtml(file.name)}
-      </div>
+      <div class="file-name" title="${escapeHtml(file.name)}">📄 ${escapeHtml(file.name)}</div>
       <div class="file-meta">
         <span class="file-size">${formatFileSize(file.size)}</span>
-        <button type="button" class="file-remove-btn"
-          onclick="removeInspectionFile('${fileType}', ${idx}, '${previewId}')"
-          title="Remove file">✕</button>
+        <button type="button" class="file-remove-btn" onclick="removeInspectionFile('${fileType}', ${idx}, '${previewId}')">✕</button>
       </div>
     </div>
   `).join("");
@@ -246,14 +759,6 @@ function removeInspectionFile(fileType, index, previewId) {
   }
 }
 
-function formatFileSize(bytes) {
-  if (!bytes || bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return (bytes / Math.pow(k, i)).toFixed(1) + " " + sizes[i];
-}
-
 function setTodayForInspection() {
   const now = new Date();
   const localDate = [
@@ -261,11 +766,8 @@ function setTodayForInspection() {
     String(now.getMonth() + 1).padStart(2, "0"),
     String(now.getDate()).padStart(2, "0")
   ].join("-");
-
-  const dateInput = document.getElementById("inspection-date");
-  if (dateInput) {
-    dateInput.value = localDate;
-  }
+  const el = document.getElementById("inspection-date");
+  if (el) el.value = localDate;
 }
 
 function loadInspectionCompanies() {
@@ -275,110 +777,70 @@ function loadInspectionCompanies() {
       if (!select) return;
 
       select.innerHTML = `
-        <option value="">Select Company</option>
-        ${vendors.map(vendor => `
-          <option value="${escapeHtml(vendor.companyName)}">
-            ${escapeHtml(vendor.companyName)}
-          </option>
-        `).join("")}
+        <option value="">${t("select_company")}</option>
+        ${vendors.map(v => `<option value="${escapeHtml(v.companyName)}">${escapeHtml(v.companyName)}</option>`).join("")}
       `;
-
       window.inspectionVendors = vendors;
-
-      if (vendors.length === 0) {
-        select.innerHTML =
-          '<option value="">No registered companies</option>';
-      }
     })
-    .withFailureHandler(error => {
-      showInspectionMessage(error.message, "error");
+    .withFailureHandler(err => {
+      showInspectionMessage(err.message, "error");
     })
     .getInspectionFormData();
 }
 
 function showSelectedVendor() {
-  const companySelect = document.getElementById("inspection-company");
-  if (!companySelect) return;
-  const companyName = companySelect.value;
-
-  const vendor = (window.inspectionVendors || [])
-    .find(item => item.companyName === companyName);
-
+  const select = document.getElementById("inspection-company");
   const info = document.getElementById("vendor-info");
-  if (!info) return;
+  if (!select || !info) return;
 
+  const vendor = (window.inspectionVendors || []).find(v => v.companyName === select.value);
   if (!vendor) {
-    info.innerHTML = "กรุณาเลือกบริษัท";
+    info.innerHTML = currentLang === 'th' ? "กรุณาเลือกบริษัท" : "Please select a company";
     return;
   }
 
   info.innerHTML = `
-    <div><strong>Work Location:</strong>
-      ${escapeHtml(vendor.workLocation)}</div>
-    <div><strong>Work Types:</strong>
-      ${(vendor.workTypes && vendor.workTypes.length > 0)
-        ? vendor.workTypes.map(type =>
-            `<span class="type-tag">${escapeHtml(type)}</span>`
-          ).join(" ")
-        : '<span style="color:var(--muted)">ไม่มีประเภทงานที่ระบุ</span>'}
+    <div><strong>${currentLang === 'th' ? 'พื้นที่ปฏิบัติงาน' : 'Work Location'}:</strong> ${escapeHtml(vendor.workLocation)}</div>
+    <div><strong>${currentLang === 'th' ? 'ประเภทงาน' : 'Work Types'}:</strong>
+      ${(vendor.workTypes || []).map(t => `<span class="type-tag">${escapeHtml(t)}</span>`).join(" ")}
     </div>
   `;
 }
 
 function readInspectionFile(file, fileType) {
   return new Promise((resolve, reject) => {
-    if (file.size > 5 * 1024 * 1024) {
-      reject(new Error(file.name + " มีขนาดเกิน 5 MB"));
-      return;
-    }
-
+    if (file.size > 5 * 1024 * 1024) return reject(new Error(file.name + " มีขนาดเกิน 5 MB"));
     const reader = new FileReader();
-
-    reader.onload = () => {
-      resolve({
-        name: file.name,
-        mimeType: file.type || "application/octet-stream",
-        fileType: fileType,
-        data: reader.result
-      });
-    };
-
-    reader.onerror = () => {
-      reject(new Error("ไม่สามารถอ่านไฟล์ " + file.name));
-    };
-
+    reader.onload = () => resolve({ name: file.name, mimeType: file.type || "application/octet-stream", fileType: fileType, data: reader.result });
+    reader.onerror = () => reject(new Error("ไม่สามารถอ่านไฟล์ " + file.name));
     reader.readAsDataURL(file);
   });
 }
 
 async function submitInspectionForm(event) {
   event.preventDefault();
-
   const button = document.getElementById("save-inspection-button");
   const checkIn = document.getElementById("check-in").value;
   const checkOut = document.getElementById("check-out").value;
 
-  // Validate check-in and check-out consistency
   if (checkIn && checkOut && checkOut < checkIn) {
     showInspectionMessage("เวลาตรวจออก (Check-out) ต้องไม่เกิดขึ้นก่อนเวลาเข้าตรวจ (Check-in)", "error");
     return;
   }
 
   button.disabled = true;
-  button.textContent = "กำลังประมวลผลและอ่านไฟล์...";
+  button.textContent = currentLang === 'th' ? "กำลังประมวลผลไฟล์..." : "Processing files...";
 
   try {
     const files = [];
-    const fileTypes = ["Before", "After", "Work Permit"];
-
-    for (const type of fileTypes) {
-      const selected = window.inspectionFileState[type] || [];
-      for (const file of selected) {
-        files.push(await readInspectionFile(file, type));
+    const types = ["Before", "After", "Work Permit"];
+    for (const t of types) {
+      for (const f of (window.inspectionFileState[t] || [])) {
+        files.push(await readInspectionFile(f, t));
       }
     }
 
-    button.textContent = "กำลังบันทึกข้อมูลและอัปโหลดหลักฐาน...";
+    button.textContent = t("saving");
 
     const formData = {
       companyName: document.getElementById("inspection-company").value,
@@ -392,318 +854,663 @@ async function submitInspectionForm(event) {
     };
 
     google.script.run
-      .withSuccessHandler(result => {
-        const fileInfo = result.fileCount > 0 ? ` (แนบไฟล์ ${result.fileCount} ไฟล์)` : "";
-        showInspectionMessage(`✔ ${result.message}${fileInfo}`, "success");
-
+      .withSuccessHandler(res => {
+        const fileInfo = res.fileCount > 0 ? ` (${res.fileCount} files)` : "";
+        showInspectionMessage(`✔ ${res.message}${fileInfo}`, "success");
         document.getElementById("inspection-form").reset();
-        window.inspectionFileState = {
-          Before: [],
-          After: [],
-          "Work Permit": []
-        };
+        window.inspectionFileState = { Before: [], After: [], "Work Permit": [] };
         renderFilePreview("Before", "before-preview");
         renderFilePreview("After", "after-preview");
         renderFilePreview("Work Permit", "permit-preview");
-
         setTodayForInspection();
-
-        document.getElementById("vendor-info").innerHTML = "กรุณาเลือกบริษัท";
-
+        document.getElementById("vendor-info").innerHTML = currentLang === 'th' ? "กรุณาเลือกบริษัท" : "Please select a company";
         button.disabled = false;
-        button.textContent = "Save Inspection";
+        button.textContent = currentLang === 'th' ? 'บันทึกการตรวจสอบ' : 'Save Inspection';
       })
-      .withFailureHandler(error => {
-        showInspectionMessage(`⚠ ${error.message}`, "error");
+      .withFailureHandler(err => {
+        showInspectionMessage(`⚠ ${err.message}`, "error");
         button.disabled = false;
-        button.textContent = "Save Inspection";
+        button.textContent = currentLang === 'th' ? 'บันทึกการตรวจสอบ' : 'Save Inspection';
       })
       .saveInspection(formData);
 
-  } catch (error) {
-    showInspectionMessage(`⚠ ${error.message}`, "error");
+  } catch (err) {
+    showInspectionMessage(`⚠ ${err.message}`, "error");
     button.disabled = false;
-    button.textContent = "Save Inspection";
+    button.textContent = currentLang === 'th' ? 'บันทึกการตรวจสอบ' : 'Save Inspection';
   }
 }
 
-function showInspectionMessage(message, type) {
+function showInspectionMessage(msg, type) {
   const box = document.getElementById("inspection-message");
   if (!box) return;
-
-  box.textContent = message;
+  box.textContent = msg;
   box.className = "form-message " + type;
   box.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-
-function renderDashboard() {
-  document.getElementById("page-content").innerHTML = `
-    <div class="welcome">
-      <div>
-        <h1>Vendor Safety Dashboard</h1>
-        <p>Monitor and manage contractor safety inspections.</p>
-      </div>
-      <div class="date-box">
-        <label>Select Inspection Date</label>
-        <input type="date" id="dashboard-date">
-      </div>
-    </div>
-
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <span>COMPANIES INSPECTED</span>
-        <h2>0</h2>
-        <small>Unique companies today</small>
-      </div>
-      <div class="kpi-card">
-        <span>TOTAL INSPECTIONS</span>
-        <h2>0</h2>
-        <small>Inspection records</small>
-      </div>
-      <div class="kpi-card">
-        <span>MORNING INSPECTIONS</span>
-        <h2>0</h2>
-        <small>Morning period</small>
-      </div>
-      <div class="kpi-card">
-        <span>AFTERNOON INSPECTIONS</span>
-        <h2>0</h2>
-        <small>Afternoon period</small>
-      </div>
-    </div>
-
-    <div class="content-card">
-      <div class="section-heading">
-        <h3>Daily Inspection Records</h3>
-        <p>รายการตรวจสอบผู้รับเหมาตามวันที่เลือก</p>
-      </div>
-      <div class="empty-state">
-        <div class="empty-icon">▤</div>
-        <h3>No Inspection Data</h3>
-        <p>Inspection records will appear here.</p>
-      </div>
-    </div>
-  `;
-}
-
-
-function renderVendorPage() {
+// ========================================================
+// 6. Module: Inspection History
+// ========================================================
+function renderHistoryPage() {
   const content = document.getElementById("page-content");
-
   content.innerHTML = `
     <div class="welcome">
       <div>
-        <h1>Vendor Registration</h1>
-        <p>Register and manage contractor companies.</p>
+        <h1>${t("menu_history")}</h1>
+        <p>${currentLang === 'th' ? 'สืบค้นประวัติการตรวจความปลอดภัยและดูหลักฐานรูปภาพ' : 'Search past inspection records and view photo evidence'}</p>
       </div>
-      <div class="vendor-count" id="vendor-count">
-        Loading...
-      </div>
+      <div id="history-total-count" class="vendor-count">${t("loading")}</div>
     </div>
 
-    <div class="vendor-layout">
-
-      <div class="content-card">
-        <div class="section-heading">
-          <h3>Register New Vendor</h3>
-          <p>กรอกข้อมูลบริษัทผู้รับเหมา</p>
-        </div>
-
-        <form id="vendor-form" class="vendor-form">
-
-          <div class="form-group">
-            <label>Company Name <span>*</span></label>
-            <input
-              type="text"
-              id="company-name"
-              placeholder="Enter company name"
-              required>
-          </div>
-
-          <div class="form-group">
-            <label>Work Location <span>*</span></label>
-            <input
-              type="text"
-              id="work-location"
-              placeholder="Enter work location"
-              required>
-          </div>
-
-          <div class="form-group">
-            <label>Work Types <span>*</span></label>
-            <p class="field-hint">
-              Select all work types that apply.
-            </p>
-            <div id="work-type-list" class="work-type-list">
-              <p class="loading-text">Loading work types...</p>
-            </div>
-          </div>
-
-          <div id="vendor-message" class="form-message"></div>
-
-          <button type="submit" class="primary-button"
-            id="save-vendor-button">
-            Save Vendor
-          </button>
-
-        </form>
+    <div class="content-card">
+      <div class="filter-toolbar">
+        <input type="text" id="history-search" class="search-input" placeholder="${t('search_placeholder')}">
+        <input type="date" id="history-date-filter" class="filter-select">
+        <select id="history-result-filter" class="filter-select">
+          <option value="">${currentLang === 'th' ? 'ผลตรวจทั้งหมด' : 'All Results'}</option>
+          <option value="ผ่าน">${t("status_pass")}</option>
+          <option value="ต้องปรับปรุง">${t("status_improve")}</option>
+          <option value="ไม่ผ่าน">${t("status_fail")}</option>
+        </select>
+        <button class="btn-sm btn-outline" onclick="resetHistoryFilters()">${currentLang === 'th' ? 'ล้างตัวกรอง' : 'Reset'}</button>
       </div>
 
-      <div class="content-card">
-        <div class="section-heading">
-          <h3>Registered Vendors</h3>
-          <p>รายชื่อบริษัทที่ลงทะเบียนแล้ว</p>
-        </div>
-
-        <div class="vendor-table-wrap">
-          <table class="vendor-table">
-            <thead>
-              <tr>
-                <th>Company</th>
-                <th>Work Location</th>
-                <th>Work Types</th>
-              </tr>
-            </thead>
-            <tbody id="vendor-table-body">
-              <tr>
-                <td colspan="3">Loading vendors...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <div class="vendor-table-wrap">
+        <table class="vendor-table">
+          <thead>
+            <tr>
+              <th>${currentLang === 'th' ? 'วันที่' : 'Date'}</th>
+              <th>${currentLang === 'th' ? 'บริษัท' : 'Company'}</th>
+              <th>${currentLang === 'th' ? 'รอบตรวจ' : 'Period'}</th>
+              <th>${currentLang === 'th' ? 'เวลา' : 'Time'}</th>
+              <th>${currentLang === 'th' ? 'ผลการตรวจ' : 'Result'}</th>
+              <th>${currentLang === 'th' ? 'หลักฐาน' : 'Evidence'}</th>
+              <th>${currentLang === 'th' ? 'รายละเอียด' : 'Details'}</th>
+            </tr>
+          </thead>
+          <tbody id="history-table-body">
+            <tr><td colspan="7">${t("loading")}</td></tr>
+          </tbody>
+        </table>
       </div>
-
     </div>
   `;
 
-  document.getElementById("vendor-form")
-    .addEventListener("submit", submitVendorForm);
+  document.getElementById("history-search").addEventListener("input", filterHistoryDisplay);
+  document.getElementById("history-date-filter").addEventListener("change", filterHistoryDisplay);
+  document.getElementById("history-result-filter").addEventListener("change", filterHistoryDisplay);
 
-  loadVendorPageData();
+  loadHistoryData();
 }
 
-
-function loadVendorPageData() {
+function loadHistoryData() {
   google.script.run
-    .withSuccessHandler(data => {
-      renderWorkTypes(data.workTypes);
-      renderVendorList(data.vendors);
+    .withSuccessHandler(records => {
+      window.cachedHistory = records;
+      filterHistoryDisplay();
     })
-    .withFailureHandler(error => {
-      showVendorMessage(error.message, "error");
-      document.getElementById("vendor-table-body").innerHTML =
-        `<tr><td colspan="3">Unable to load data.</td></tr>`;
+    .withFailureHandler(err => {
+      const tbody = document.getElementById("history-table-body");
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="form-message error">⚠ ${escapeHtml(err.message)}</td></tr>`;
     })
-    .getVendorPageData();
+    .getInspectionHistory({});
 }
 
+function filterHistoryDisplay() {
+  if (!window.cachedHistory) return;
+  const q = (document.getElementById("history-search")?.value || "").toLowerCase().trim();
+  const dateVal = document.getElementById("history-date-filter")?.value || "";
+  const resVal = document.getElementById("history-result-filter")?.value || "";
 
-function renderWorkTypes(workTypes) {
-  const container = document.getElementById("work-type-list");
+  const filtered = window.cachedHistory.filter(item => {
+    const matchQ = item.companyName.toLowerCase().includes(q) || (item.remarks || "").toLowerCase().includes(q);
+    const matchDate = !dateVal || item.inspectionDate === dateVal;
+    const matchRes = !resVal || item.result === resVal;
+    return matchQ && matchDate && matchRes;
+  });
 
-  if (!workTypes || workTypes.length === 0) {
-    container.innerHTML = "<p>No work types available.</p>";
+  const countEl = document.getElementById("history-total-count");
+  if (countEl) countEl.textContent = `${filtered.length} ${currentLang === 'th' ? 'รายการ' : 'Records'}`;
+
+  const tbody = document.getElementById("history-table-body");
+  if (!tbody) return;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:var(--muted);">${t("no_data")}</td></tr>`;
     return;
   }
 
-  container.innerHTML = workTypes.map((type, index) => `
-    <label class="work-type-option">
-      <input type="checkbox" name="work-type"
-        value="${escapeHtml(type)}">
-      <span>${escapeHtml(type)}</span>
-    </label>
-  `).join("");
-}
-
-
-function renderVendorList(vendors) {
-  const tbody = document.getElementById("vendor-table-body");
-  const count = document.getElementById("vendor-count");
-
-  count.textContent = `${vendors.length} Registered Companies`;
-
-  if (!vendors.length) {
-    tbody.innerHTML = `
-      <tr><td colspan="3">No registered vendors yet.</td></tr>
-    `;
-    return;
-  }
-
-  tbody.innerHTML = vendors.map(vendor => `
+  tbody.innerHTML = filtered.map((r, idx) => `
     <tr>
-      <td><strong>${escapeHtml(vendor.companyName)}</strong></td>
-      <td>${escapeHtml(vendor.workLocation)}</td>
+      <td>${escapeHtml(r.inspectionDate)}</td>
+      <td><strong>${escapeHtml(r.companyName)}</strong></td>
+      <td><span class="type-tag">${escapeHtml(r.period)}</span></td>
+      <td>${escapeHtml(r.checkIn)} - ${escapeHtml(r.checkOut)}</td>
+      <td>${renderResultBadge(r.result)}</td>
       <td>
-        ${(vendor.workTypes || []).map(type =>
-          `<span class="type-tag">${escapeHtml(type)}</span>`
-        ).join(" ")}
+        ${r.files && r.files.length > 0
+          ? `<span class="badge badge-active">📎 ${r.files.length} ${currentLang === 'th' ? 'ไฟล์' : 'files'}</span>`
+          : '<span style="color:var(--muted);">-</span>'}
+      </td>
+      <td>
+        <button class="btn-sm btn-outline" onclick="openInspectionDetailModal(${idx})">
+          ${currentLang === 'th' ? 'ดูรายละเอียด' : 'View'}
+        </button>
       </td>
     </tr>
   `).join("");
 }
 
+function resetHistoryFilters() {
+  if (document.getElementById("history-search")) document.getElementById("history-search").value = "";
+  if (document.getElementById("history-date-filter")) document.getElementById("history-date-filter").value = "";
+  if (document.getElementById("history-result-filter")) document.getElementById("history-result-filter").value = "";
+  filterHistoryDisplay();
+}
 
-function submitVendorForm(event) {
-  event.preventDefault();
+function openInspectionDetailModal(index) {
+  const item = (window.cachedHistory || [])[index];
+  if (!item) return;
 
-  const button = document.getElementById("save-vendor-button");
-  const selectedTypes = Array.from(
-    document.querySelectorAll('input[name="work-type"]:checked')
-  ).map(input => input.value);
+  const filesHtml = (item.files && item.files.length > 0)
+    ? `
+      <div class="evidence-gallery">
+        ${item.files.map(f => `
+          <div class="evidence-card">
+            <div class="file-icon">${f.fileType === 'Work Permit' ? '📄' : '🖼️'}</div>
+            <span class="type-tag" style="margin-bottom:6px;">${escapeHtml(f.fileType)}</span>
+            <a href="${f.fileUrl}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(f.fileName)}">
+              ${escapeHtml(f.fileName)}
+            </a>
+          </div>
+        `).join("")}
+      </div>
+    `
+    : `<p style="color:var(--muted);">${currentLang === 'th' ? 'ไม่มีไฟล์แนบในรายการนี้' : 'No attachments.'}</p>`;
 
-  const formData = {
-    companyName: document.getElementById("company-name").value,
-    workLocation: document.getElementById("work-location").value,
-    workTypes: selectedTypes
-  };
+  const modalHtml = `
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>${currentLang === 'th' ? 'รายละเอียดการตรวจความปลอดภัย' : 'Inspection Record Details'}</h3>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+          <div><strong>${currentLang === 'th' ? 'บริษัท' : 'Company'}:</strong> ${escapeHtml(item.companyName)}</div>
+          <div><strong>${currentLang === 'th' ? 'วันที่' : 'Date'}:</strong> ${escapeHtml(item.inspectionDate)} (${escapeHtml(item.period)})</div>
+          <div><strong>${currentLang === 'th' ? 'เวลา' : 'Time'}:</strong> ${escapeHtml(item.checkIn)} - ${escapeHtml(item.checkOut)}</div>
+          <div><strong>${currentLang === 'th' ? 'ผลการตรวจ' : 'Result'}:</strong> ${renderResultBadge(item.result)}</div>
+        </div>
 
-  if (selectedTypes.length === 0) {
-    showVendorMessage("กรุณาเลือกประเภทงานอย่างน้อย 1 ประเภท", "error");
+        <div style="margin-bottom:16px;">
+          <strong>${currentLang === 'th' ? 'หมายเหตุ / รายละเอียด' : 'Remarks'}:</strong>
+          <p style="background:#17212B; padding:10px; border-radius:6px; border:1px solid var(--border); margin-top:4px;">
+            ${escapeHtml(item.remarks || "-")}
+          </p>
+        </div>
+
+        <div>
+          <strong>${t("evidence_section")} (${(item.files || []).length}):</strong>
+          ${filesHtml}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-sm btn-outline" onclick="closeModal()">${t("close")}</button>
+      </div>
+    </div>
+  `;
+
+  openModal(modalHtml);
+}
+
+// ========================================================
+// 7. Module: Work Permit
+// ========================================================
+function renderPermitsPage() {
+  const content = document.getElementById("page-content");
+  content.innerHTML = `
+    <div class="welcome">
+      <div>
+        <h1>${t("menu_permits")}</h1>
+        <p>${currentLang === 'th' ? 'ระบบออกใบอนุญาตและติดตามงานที่มีความเสี่ยงสูง' : 'Permit-to-work issuance and compliance tracking'}</p>
+      </div>
+      <button class="primary-button" onclick="openCreatePermitModal()">
+        + ${currentLang === 'th' ? 'ออกใบอนุญาตใหม่' : 'Issue Work Permit'}
+      </button>
+    </div>
+
+    <div class="content-card">
+      <div class="filter-toolbar">
+        <input type="text" id="permit-search" class="search-input" placeholder="${t('search_placeholder')}">
+        <select id="permit-status-filter" class="filter-select">
+          <option value="">${currentLang === 'th' ? 'สถานะทั้งหมด' : 'All Statuses'}</option>
+          <option value="Active">Active</option>
+          <option value="Completed">Completed</option>
+          <option value="Cancelled">Cancelled</option>
+        </select>
+      </div>
+
+      <div class="vendor-table-wrap">
+        <table class="vendor-table">
+          <thead>
+            <tr>
+              <th>${currentLang === 'th' ? 'เลขที่ Permit' : 'Permit No.'}</th>
+              <th>${currentLang === 'th' ? 'บริษัท' : 'Company'}</th>
+              <th>${currentLang === 'th' ? 'ประเภทงาน' : 'Work Type'}</th>
+              <th>${currentLang === 'th' ? 'ช่วงวันที่อนุญาต' : 'Valid Dates'}</th>
+              <th>${currentLang === 'th' ? 'ผู้ควบคุมงาน' : 'Supervisor'}</th>
+              <th>${currentLang === 'th' ? 'สถานะ' : 'Status'}</th>
+              <th>${currentLang === 'th' ? 'การจัดการ' : 'Action'}</th>
+            </tr>
+          </thead>
+          <tbody id="permit-table-body">
+            <tr><td colspan="7">${t("loading")}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("permit-search").addEventListener("input", filterPermitsDisplay);
+  document.getElementById("permit-status-filter").addEventListener("change", filterPermitsDisplay);
+
+  loadWorkPermitData();
+}
+
+function loadWorkPermitData() {
+  google.script.run
+    .withSuccessHandler(data => {
+      window.cachedPermitsData = data;
+      filterPermitsDisplay();
+    })
+    .withFailureHandler(err => {
+      const tbody = document.getElementById("permit-table-body");
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="form-message error">⚠ ${escapeHtml(err.message)}</td></tr>`;
+    })
+    .getWorkPermitData();
+}
+
+function filterPermitsDisplay() {
+  if (!window.cachedPermitsData) return;
+  const q = (document.getElementById("permit-search")?.value || "").toLowerCase().trim();
+  const status = document.getElementById("permit-status-filter")?.value || "";
+
+  const permits = window.cachedPermitsData.permits || [];
+  const filtered = permits.filter(p => {
+    const matchQ = p.permitNo.toLowerCase().includes(q) || p.companyName.toLowerCase().includes(q) || p.workType.toLowerCase().includes(q);
+    const matchStatus = !status || p.status === status;
+    return matchQ && matchStatus;
+  });
+
+  const tbody = document.getElementById("permit-table-body");
+  if (!tbody) return;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:var(--muted);">${t("no_data")}</td></tr>`;
     return;
   }
 
-  button.disabled = true;
-  button.textContent = "Saving...";
-
-  google.script.run
-    .withSuccessHandler(result => {
-      showVendorMessage(result.message, "success");
-      document.getElementById("vendor-form").reset();
-      loadVendorPageData();
-      button.disabled = false;
-      button.textContent = "Save Vendor";
-    })
-    .withFailureHandler(error => {
-      showVendorMessage(error.message, "error");
-      button.disabled = false;
-      button.textContent = "Save Vendor";
-    })
-    .saveVendor(formData);
+  tbody.innerHTML = filtered.map(p => `
+    <tr>
+      <td><strong>${escapeHtml(p.permitNo)}</strong></td>
+      <td>${escapeHtml(p.companyName)}</td>
+      <td><span class="type-tag">${escapeHtml(p.workType)}</span></td>
+      <td>${escapeHtml(p.startDate)} - ${escapeHtml(p.endDate)}</td>
+      <td>${escapeHtml(p.supervisorName)}</td>
+      <td>
+        <span class="badge ${p.status === 'Active' ? 'badge-active' : (p.status === 'Completed' ? 'badge-pass' : 'badge-fail')}">
+          ${escapeHtml(p.status)}
+        </span>
+      </td>
+      <td>
+        ${p.status === 'Active' ? `
+          <button class="btn-sm btn-outline" onclick="changePermitStatusAction('${p.permitNo}', 'Completed')">
+            ${currentLang === 'th' ? 'ปิดงาน' : 'Close'}
+          </button>
+        ` : '-'}
+      </td>
+    </tr>
+  `).join("");
 }
 
+function openCreatePermitModal() {
+  const data = window.cachedPermitsData || { vendors: [], workTypes: [] };
+  const modalHtml = `
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>${currentLang === 'th' ? 'ออกใบอนุญาตทำงาน (Work Permit)' : 'Issue Work Permit'}</h3>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="create-permit-form">
+          <div class="form-group">
+            <label>${currentLang === 'th' ? 'เลือกบริษัท' : 'Company'} <span>*</span></label>
+            <select id="wp-company" required>
+              <option value="">${t("select_company")}</option>
+              ${data.vendors.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("")}
+            </select>
+          </div>
 
-function showVendorMessage(message, type) {
-  const box = document.getElementById("vendor-message");
+          <div class="form-group">
+            <label>${currentLang === 'th' ? 'พื้นที่ปฏิบัติงาน' : 'Work Location'} <span>*</span></label>
+            <input type="text" id="wp-location" placeholder="e.g. Substation 2" required>
+          </div>
 
-  if (!box) return;
+          <div class="form-group">
+            <label>${currentLang === 'th' ? 'ประเภทงานเสี่ยงสูง' : 'Work Type'} <span>*</span></label>
+            <select id="wp-type" required>
+              <option value="">${currentLang === 'th' ? 'เลือกประเภทงาน' : 'Select Type'}</option>
+              ${data.workTypes.map(w => `<option value="${escapeHtml(w)}">${escapeHtml(w)}</option>`).join("")}
+            </select>
+          </div>
 
-  box.textContent = message;
-  box.className = "form-message " + type;
-}
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="form-group">
+              <label>${currentLang === 'th' ? 'วันที่เริ่ม' : 'Start Date'} <span>*</span></label>
+              <input type="date" id="wp-start" required>
+            </div>
+            <div class="form-group">
+              <label>${currentLang === 'th' ? 'วันที่สิ้นสุด' : 'End Date'} <span>*</span></label>
+              <input type="date" id="wp-end" required>
+            </div>
+          </div>
 
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="form-group">
+              <label>${currentLang === 'th' ? 'ผู้ควบคุมงาน' : 'Supervisor Name'}</label>
+              <input type="text" id="wp-supervisor" placeholder="Supervisor name">
+            </div>
+            <div class="form-group">
+              <label>${currentLang === 'th' ? 'เจ้าหน้าที่ความปลอดภัย (จป.)' : 'Safety Officer'}</label>
+              <input type="text" id="wp-safety-officer" placeholder="Safety officer name">
+            </div>
+          </div>
 
-function renderComingSoon(title) {
-  document.getElementById("page-content").innerHTML = `
-    <div class="content-card">
-      <h3>${escapeHtml(title)}</h3>
-      <p style="color:#A7B0B8">
-        This module will be developed in the next step.
-      </p>
+          <div class="form-group">
+            <label>${currentLang === 'th' ? 'มาตรการความปลอดภัยเฉพาะงาน' : 'Safety Measures & Notes'}</label>
+            <textarea id="wp-notes" rows="2" placeholder="e.g. PPE required, fire extinguisher on site"></textarea>
+          </div>
+
+          <div id="create-permit-msg" class="form-message"></div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-sm btn-outline" onclick="closeModal()">${t("cancel")}</button>
+        <button class="btn-sm primary-button" id="submit-wp-btn" onclick="submitCreatePermit()">${t("save")}</button>
+      </div>
     </div>
   `;
+
+  openModal(modalHtml);
 }
 
+function submitCreatePermit() {
+  const form = {
+    companyName: document.getElementById("wp-company")?.value,
+    workLocation: document.getElementById("wp-location")?.value,
+    workType: document.getElementById("wp-type")?.value,
+    startDate: document.getElementById("wp-start")?.value,
+    endDate: document.getElementById("wp-end")?.value,
+    supervisorName: document.getElementById("wp-supervisor")?.value,
+    safetyOfficer: document.getElementById("wp-safety-officer")?.value,
+    safetyNotes: document.getElementById("wp-notes")?.value
+  };
+
+  const msg = document.getElementById("create-permit-msg");
+  const btn = document.getElementById("submit-wp-btn");
+
+  if (!form.companyName || !form.workLocation || !form.workType || !form.startDate || !form.endDate) {
+    msg.textContent = currentLang === 'th' ? "กรุณากรอกข้อมูลที่จำเป็น (*) ให้ครบถ้วน" : "Please fill in all required fields (*)";
+    msg.className = "form-message error";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = t("saving");
+
+  google.script.run
+    .withSuccessHandler(res => {
+      closeModal();
+      alert("✔ " + res.message);
+      loadWorkPermitData();
+    })
+    .withFailureHandler(err => {
+      msg.textContent = "⚠ " + err.message;
+      msg.className = "form-message error";
+      btn.disabled = false;
+      btn.textContent = t("save");
+    })
+    .saveWorkPermit(form);
+}
+
+function changePermitStatusAction(permitNo, status) {
+  if (!confirm(currentLang === 'th' ? `ต้องการปิดงานใบอนุญาต ${permitNo} หรือไม่?` : `Close permit ${permitNo}?`)) return;
+
+  google.script.run
+    .withSuccessHandler(res => {
+      alert("✔ " + res.message);
+      loadWorkPermitData();
+    })
+    .withFailureHandler(err => {
+      alert("⚠ " + err.message);
+    })
+    .updatePermitStatus(permitNo, status);
+}
+
+// ========================================================
+// 8. Module: Document Management
+// ========================================================
+function renderDocumentsPage() {
+  const content = document.getElementById("page-content");
+  content.innerHTML = `
+    <div class="welcome">
+      <div>
+        <h1>${t("menu_documents")}</h1>
+        <p>${currentLang === 'th' ? 'ศูนย์รวมเอกสาร ภาพถ่ายหลักฐาน และใบอนุญาตในระบบ' : 'Central repository for evidence photos and permit files'}</p>
+      </div>
+      <div id="docs-total-count" class="vendor-count">${t("loading")}</div>
+    </div>
+
+    <div class="content-card">
+      <div class="filter-toolbar">
+        <input type="text" id="doc-search" class="search-input" placeholder="${t('search_placeholder')}">
+        <select id="doc-type-filter" class="filter-select">
+          <option value="">${currentLang === 'th' ? 'ประเภทเอกสารทั้งหมด' : 'All Types'}</option>
+          <option value="Before">Before Photos</option>
+          <option value="After">After Photos</option>
+          <option value="Work Permit">Work Permit</option>
+        </select>
+      </div>
+
+      <div class="vendor-table-wrap">
+        <table class="vendor-table">
+          <thead>
+            <tr>
+              <th>${currentLang === 'th' ? 'ชื่อไฟล์' : 'File Name'}</th>
+              <th>${currentLang === 'th' ? 'ประเภท' : 'Type'}</th>
+              <th>${currentLang === 'th' ? 'บริษัท' : 'Company'}</th>
+              <th>${currentLang === 'th' ? 'วันที่ตรวจ' : 'Inspection Date'}</th>
+              <th>${currentLang === 'th' ? 'การเข้าถึง' : 'Access'}</th>
+            </tr>
+          </thead>
+          <tbody id="docs-table-body">
+            <tr><td colspan="5">${t("loading")}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("doc-search").addEventListener("input", filterDocumentsDisplay);
+  document.getElementById("doc-type-filter").addEventListener("change", filterDocumentsDisplay);
+
+  loadDocumentsData();
+}
+
+function loadDocumentsData() {
+  google.script.run
+    .withSuccessHandler(files => {
+      window.cachedDocuments = files;
+      filterDocumentsDisplay();
+    })
+    .withFailureHandler(err => {
+      const tbody = document.getElementById("docs-table-body");
+      if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="form-message error">⚠ ${escapeHtml(err.message)}</td></tr>`;
+    })
+    .getAllDocuments({});
+}
+
+function filterDocumentsDisplay() {
+  if (!window.cachedDocuments) return;
+  const q = (document.getElementById("doc-search")?.value || "").toLowerCase().trim();
+  const type = document.getElementById("doc-type-filter")?.value || "";
+
+  const filtered = window.cachedDocuments.filter(f => {
+    const matchQ = f.fileName.toLowerCase().includes(q) || f.companyName.toLowerCase().includes(q);
+    const matchType = !type || f.fileType === type;
+    return matchQ && matchType;
+  });
+
+  const countEl = document.getElementById("docs-total-count");
+  if (countEl) countEl.textContent = `${filtered.length} ${currentLang === 'th' ? 'ไฟล์' : 'Files'}`;
+
+  const tbody = document.getElementById("docs-table-body");
+  if (!tbody) return;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--muted);">${t("no_data")}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(f => `
+    <tr>
+      <td><strong>📄 ${escapeHtml(f.fileName)}</strong></td>
+      <td><span class="type-tag">${escapeHtml(f.fileType)}</span></td>
+      <td>${escapeHtml(f.companyName)}</td>
+      <td>${escapeHtml(f.inspectionDate)} (${escapeHtml(f.period)})</td>
+      <td>
+        <a href="${f.fileUrl}" target="_blank" rel="noopener noreferrer" class="btn-sm btn-outline" style="text-decoration:none; display:inline-block;">
+          ↗ ${currentLang === 'th' ? 'เปิดใน Drive' : 'Open in Drive'}
+        </a>
+      </td>
+    </tr>
+  `).join("");
+}
+
+// ========================================================
+// 9. Module: Request Department Archives
+// ========================================================
+function renderArchivesPage() {
+  const content = document.getElementById("page-content");
+  content.innerHTML = `
+    <div class="welcome">
+      <div>
+        <h1>${t("menu_archives")}</h1>
+        <p>${currentLang === 'th' ? 'คลังสถิติความปลอดภัยและประวัติการทำงานรายผู้รับเหมา' : 'Safety historical performance archives by vendor'}</p>
+      </div>
+      <button class="btn-sm btn-outline" onclick="window.print()">
+        🖨️ ${currentLang === 'th' ? 'พิมพ์รายงาน' : 'Print Report'}
+      </button>
+    </div>
+
+    <div class="content-card">
+      <div class="section-heading">
+        <h3>${currentLang === 'th' ? 'รายงานประวัติความปลอดภัยผู้รับเหมา' : 'Vendor Safety Performance Records'}</h3>
+        <p>${currentLang === 'th' ? 'ข้อมูลสรุปอัตราการผ่านและเอกสารที่จัดเก็บ' : 'Summary of inspection pass rate and stored files'}</p>
+      </div>
+
+      <div class="vendor-table-wrap">
+        <table class="vendor-table">
+          <thead>
+            <tr>
+              <th>${currentLang === 'th' ? 'ชื่อบริษัท' : 'Company'}</th>
+              <th>${currentLang === 'th' ? 'ตรวจทั้งหมด' : 'Total Inspections'}</th>
+              <th>${currentLang === 'th' ? 'อัตราผ่าน (%)' : 'Pass Rate'}</th>
+              <th>${currentLang === 'th' ? 'ผลผ่าน' : 'Passed'}</th>
+              <th>${currentLang === 'th' ? 'ต้องปรับปรุง / ตก' : 'Issues'}</th>
+              <th>${currentLang === 'th' ? 'เอกสารในคลัง' : 'Documents'}</th>
+              <th>${currentLang === 'th' ? 'ตรวจล่าสุด' : 'Last Inspection'}</th>
+            </tr>
+          </thead>
+          <tbody id="archives-table-body">
+            <tr><td colspan="7">${t("loading")}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  loadArchivesData();
+}
+
+function loadArchivesData() {
+  google.script.run
+    .withSuccessHandler(list => {
+      const tbody = document.getElementById("archives-table-body");
+      if (!tbody) return;
+
+      if (!list || list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:var(--muted);">${t("no_data")}</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(item => `
+        <tr>
+          <td><strong>${escapeHtml(item.companyName)}</strong></td>
+          <td>${item.totalInspections}</td>
+          <td>
+            <span class="badge ${item.passRate >= 80 ? 'badge-pass' : (item.passRate >= 50 ? 'badge-improve' : 'badge-fail')}">
+              ${item.passRate}%
+            </span>
+          </td>
+          <td><span style="color:#48C798;">${item.passCount}</span></td>
+          <td><span style="color:#F77676;">${item.failCount + item.improveCount}</span></td>
+          <td>📎 ${item.documentCount}</td>
+          <td>${escapeHtml(item.lastInspectionDate)}</td>
+        </tr>
+      `).join("");
+    })
+    .withFailureHandler(err => {
+      const tbody = document.getElementById("archives-table-body");
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="form-message error">⚠ ${escapeHtml(err.message)}</td></tr>`;
+    })
+    .getDepartmentArchives();
+}
+
+// ========================================================
+// 10. Modal Utilities & Helpers
+// ========================================================
+function openModal(html) {
+  const container = document.getElementById("modal-container");
+  if (!container) return;
+  container.innerHTML = `<div class="modal-backdrop" onclick="handleBackdropClick(event)">${html}</div>`;
+}
+
+function closeModal() {
+  const container = document.getElementById("modal-container");
+  if (container) container.innerHTML = "";
+}
+
+function handleBackdropClick(event) {
+  if (event.target.classList.contains("modal-backdrop")) {
+    closeModal();
+  }
+}
+
+function renderResultBadge(result) {
+  if (result === "ผ่าน") return `<span class="badge badge-pass">${t("status_pass")}</span>`;
+  if (result === "ต้องปรับปรุง") return `<span class="badge badge-improve">${t("status_improve")}</span>`;
+  return `<span class="badge badge-fail">${t("status_fail")}</span>`;
+}
+
+function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return (bytes / Math.pow(k, i)).toFixed(1) + " " + sizes[i];
+}
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, char => ({
@@ -714,4 +1521,12 @@ function escapeHtml(value) {
     "'": "&#39;"
   })[char]);
 }
+
+// ========================================================
+// 11. App Initialization
+// ========================================================
+window.addEventListener("DOMContentLoaded", () => {
+  setLanguage(currentLang);
+  showPage("dashboard", document.getElementById("nav-dashboard"));
+});
 </script>

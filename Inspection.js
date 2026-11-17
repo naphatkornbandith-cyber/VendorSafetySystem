@@ -243,3 +243,96 @@ function safeFolderName_(name) {
     .replace(/[\\/:*?"<>|#%{}~&]/g, "_")
     .substring(0, 80);
 }
+
+
+function getDashboardData(dateText) {
+  const targetDate = dateText || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd");
+  const inspections = getSheetRecords_("Inspections");
+
+  const dailyRecords = inspections.filter(item => {
+    return formatDateText_(item.Inspection_Date) === targetDate;
+  });
+
+  const uniqueCompanies = new Set(dailyRecords.map(r => r.Company_Name)).size;
+  const morningCount = dailyRecords.filter(r => r.Inspection_Period === "Morning").length;
+  const afternoonCount = dailyRecords.filter(r => r.Inspection_Period === "Afternoon").length;
+  const passCount = dailyRecords.filter(r => r.Inspection_Result === "ผ่าน").length;
+  const improveCount = dailyRecords.filter(r => r.Inspection_Result === "ต้องปรับปรุง").length;
+  const failCount = dailyRecords.filter(r => r.Inspection_Result === "ไม่ผ่าน").length;
+
+  return {
+    targetDate: targetDate,
+    totalInspections: dailyRecords.length,
+    companiesInspected: uniqueCompanies,
+    morningCount: morningCount,
+    afternoonCount: afternoonCount,
+    passCount: passCount,
+    improveCount: improveCount,
+    failCount: failCount,
+    records: dailyRecords.map(item => ({
+      companyName: item.Company_Name,
+      inspectionDate: formatDateText_(item.Inspection_Date),
+      period: item.Inspection_Period,
+      checkIn: item.Check_In_Time || "-",
+      checkOut: item.Check_Out_Time || "-",
+      result: item.Inspection_Result,
+      remarks: item.Remarks || ""
+    }))
+  };
+}
+
+
+function getInspectionHistory(filters) {
+  const options = filters || {};
+  const inspections = getSheetRecords_("Inspections");
+  const files = getSheetRecords_("Inspection_Files");
+
+  let filtered = inspections;
+
+  if (options.companyName) {
+    const q = options.companyName.toLowerCase().trim();
+    filtered = filtered.filter(item => String(item.Company_Name).toLowerCase().includes(q));
+  }
+
+  if (options.inspectionDate) {
+    filtered = filtered.filter(item => formatDateText_(item.Inspection_Date) === options.inspectionDate);
+  }
+
+  if (options.result) {
+    filtered = filtered.filter(item => item.Inspection_Result === options.result);
+  }
+
+  // Sort descending by date and period
+  filtered.sort((a, b) => {
+    const da = formatDateText_(a.Inspection_Date);
+    const db = formatDateText_(b.Inspection_Date);
+    return db.localeCompare(da);
+  });
+
+  return filtered.map(item => {
+    const dateStr = formatDateText_(item.Inspection_Date);
+    const attachedFiles = files.filter(f =>
+      String(f.Company_Name).trim().toLowerCase() === String(item.Company_Name).trim().toLowerCase() &&
+      formatDateText_(f.Inspection_Date) === dateStr &&
+      String(f.Inspection_Period).trim() === String(item.Inspection_Period).trim()
+    ).map(f => ({
+      fileType: f.File_Type,
+      fileName: f.File_Name,
+      fileUrl: f.File_URL,
+      driveId: f.Drive_File_ID,
+      uploadedAt: f.Uploaded_At ? formatDateText_(f.Uploaded_At) : ""
+    }));
+
+    return {
+      companyName: item.Company_Name,
+      inspectionDate: dateStr,
+      period: item.Inspection_Period,
+      checkIn: item.Check_In_Time || "-",
+      checkOut: item.Check_Out_Time || "-",
+      result: item.Inspection_Result,
+      remarks: item.Remarks || "",
+      createdAt: item.Created_At ? formatDateText_(item.Created_At) : "",
+      files: attachedFiles
+    };
+  });
+}

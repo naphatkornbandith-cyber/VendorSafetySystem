@@ -8,45 +8,62 @@
 
 <body>
 
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleMobileSidebar(false)"></div>
+
   <div class="app-container">
 
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="app-sidebar">
       <div class="brand">
         <div class="brand-icon">V</div>
         <div>
           <h2>VENDOR SAFETY</h2>
-          <small>Management System</small>
+          <small id="app-brand-subtitle">Management System</small>
         </div>
       </div>
 
-      <div class="menu-label">MAIN MENU</div>
+      <div class="menu-label" id="menu-label-main">MAIN MENU</div>
 
       <nav>
-        <button class="menu-item active"
+        <button class="menu-item active" id="nav-dashboard"
           onclick="showPage('dashboard', this)">
-          <span>▦</span> Dashboard
+          <span>▦</span> <span class="nav-text" data-i18n="menu_dashboard">Dashboard</span>
         </button>
 
-        <button class="menu-item"
+        <button class="menu-item" id="nav-vendors"
           onclick="showPage('vendors', this)">
-          <span>▣</span> Vendor Registration
+          <span>▣</span> <span class="nav-text" data-i18n="menu_vendors">Vendor Registration</span>
         </button>
 
-        <button class="menu-item"
+        <button class="menu-item" id="nav-inspection"
           onclick="showPage('inspection', this)">
-          <span>☑</span> Safety Inspection
+          <span>☑</span> <span class="nav-text" data-i18n="menu_inspection">Safety Inspection</span>
         </button>
 
-        <button class="menu-item"
+        <button class="menu-item" id="nav-history"
           onclick="showPage('history', this)">
-          <span>◷</span> Inspection History
+          <span>◷</span> <span class="nav-text" data-i18n="menu_history">Inspection History</span>
+        </button>
+
+        <button class="menu-item" id="nav-permits"
+          onclick="showPage('permits', this)">
+          <span>📋</span> <span class="nav-text" data-i18n="menu_permits">Work Permit</span>
+        </button>
+
+        <button class="menu-item" id="nav-documents"
+          onclick="showPage('documents', this)">
+          <span>📁</span> <span class="nav-text" data-i18n="menu_documents">Document Management</span>
+        </button>
+
+        <button class="menu-item" id="nav-archives"
+          onclick="showPage('archives', this)">
+          <span>🏛️</span> <span class="nav-text" data-i18n="menu_archives">Department Archives</span>
         </button>
       </nav>
 
       <div class="sidebar-footer">
         <div class="status-dot"></div>
-        System Ready
+        <span id="system-ready-text" data-i18n="system_ready">System Ready (v2.0)</span>
       </div>
     </aside>
 
@@ -54,74 +71,39 @@
     <main class="main-content">
 
       <header class="topbar">
-        <div>
-          <h2 id="page-title">Dashboard</h2>
-          <p>Vendor Safety Management System</p>
+        <div style="display:flex; align-items:center; gap:14px;">
+          <button class="hamburger-btn" onclick="toggleMobileSidebar(true)" title="Menu">☰</button>
+          <div>
+            <h2 id="page-title">Dashboard</h2>
+            <p id="page-subtitle" data-i18n="subtitle_main">Vendor Safety Management System</p>
+          </div>
         </div>
 
-        <div class="topbar-right">
-          <span class="system-status">● System Online</span>
+        <div class="topbar-controls">
+          <div class="role-badge" title="Department Role">
+            <span>🛡️</span> <span id="current-role-label">Safety Officer</span>
+          </div>
+
+          <div class="lang-switch">
+            <button type="button" class="lang-btn active" id="lang-th" onclick="setLanguage('th')">TH</button>
+            <button type="button" class="lang-btn" id="lang-en" onclick="setLanguage('en')">EN</button>
+          </div>
+
+          <div class="topbar-right">
+            <span class="system-status">● <span data-i18n="online">Online</span></span>
+          </div>
         </div>
       </header>
 
-      
       <section id="page-content">
-
-        <div class="welcome">
-          <div>
-            <h1>Vendor Safety Dashboard</h1>
-            <p>Monitor and manage contractor safety inspections.</p>
-          </div>
-
-          <div class="date-box">
-            <label>Select Inspection Date</label>
-            <input type="date" id="dashboard-date">
-          </div>
-        </div>
-
-        <div class="kpi-grid">
-          <div class="kpi-card">
-            <span>COMPANIES INSPECTED</span>
-            <h2>0</h2>
-            <small>Unique companies today</small>
-          </div>
-
-          <div class="kpi-card">
-            <span>TOTAL INSPECTIONS</span>
-            <h2>0</h2>
-            <small>Inspection records</small>
-          </div>
-
-          <div class="kpi-card">
-            <span>MORNING INSPECTIONS</span>
-            <h2>0</h2>
-            <small>Morning period</small>
-          </div>
-
-          <div class="kpi-card">
-            <span>AFTERNOON INSPECTIONS</span>
-            <h2>0</h2>
-            <small>Afternoon period</small>
-          </div>
-        </div>
-
-        <div class="content-card">
-          <div class="section-heading">
-            <h3>Daily Inspection Records</h3>
-            <p>รายการตรวจสอบผู้รับเหมาตามวันที่เลือก</p>
-          </div>
-
-          <div class="empty-state">
-            <div class="empty-icon">▤</div>
-            <h3>No Inspection Data</h3>
-            <p>Inspection records will appear here.</p>
-          </div>
-        </div>
-
+        <!-- Dynamic Page View Injected by JavaScript -->
       </section>
 
     </main>
   </div>
+
+  <!-- Global Modal Container -->
+  <div id="modal-container"></div>
 
   <?!= include("JavaScript"); ?>
 
