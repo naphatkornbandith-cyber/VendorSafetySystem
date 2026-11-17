@@ -1,9 +1,18 @@
 
 function getDatabase_() {
   const props = PropertiesService.getScriptProperties();
-  const spreadsheetId = props.getProperty("VENDOR_SPREADSHEET_ID");
+  let spreadsheetId = props.getProperty("VENDOR_SPREADSHEET_ID");
 
   if (!spreadsheetId) {
+    try {
+      const activeSs = SpreadsheetApp.getActiveSpreadsheet();
+      if (activeSs) {
+        spreadsheetId = activeSs.getId();
+        props.setProperty("VENDOR_SPREADSHEET_ID", spreadsheetId);
+        return activeSs;
+      }
+    } catch (e) {}
+
     throw new Error("ไม่พบฐานข้อมูล กรุณารัน setupVendorSystem ก่อน");
   }
 

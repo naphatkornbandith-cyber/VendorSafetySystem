@@ -1,12 +1,35 @@
 
-function setupVendorSystem() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+function setupVendorSystem(customId) {
+  let ss = null;
+
+  if (customId) {
+    try {
+      ss = SpreadsheetApp.openById(String(customId).trim());
+    } catch (e) {}
+  }
 
   if (!ss) {
-    throw new Error("กรุณาเปิด Apps Script จาก Google Sheets");
+    try {
+      ss = SpreadsheetApp.getActiveSpreadsheet();
+    } catch (e) {}
   }
 
   const props = PropertiesService.getScriptProperties();
+
+  // หากเปิดเป็น Standalone ให้เช็คจาก Properties หรือสร้าง Google Sheet ใหม่อัตโนมัติ
+  if (!ss) {
+    const existingId = props.getProperty("VENDOR_SPREADSHEET_ID");
+    if (existingId) {
+      try {
+        ss = SpreadsheetApp.openById(existingId);
+      } catch (e) {}
+    }
+
+    if (!ss) {
+      ss = SpreadsheetApp.create("Vendor_Safety_Database");
+      Logger.log("สร้าง Google Sheets ฐานข้อมูลใหม่เรียบร้อยแล้ว: " + ss.getUrl());
+    }
+  }
 
   const tables = {
     Vendors: [
@@ -122,9 +145,11 @@ function setupVendorSystem() {
 
   SpreadsheetApp.flush();
 
-  SpreadsheetApp.getUi().alert(
-    "Vendor Safety Database Setup Completed!"
-  );
+  try {
+    SpreadsheetApp.getUi().alert("Vendor Safety Database Setup Completed!");
+  } catch (e) {
+    Logger.log("Vendor Safety Database Setup Completed! Spreadsheet ID: " + ss.getId() + " URL: " + ss.getUrl());
+  }
 }
 
 function formatHeader_(sheet, columnCount) {
