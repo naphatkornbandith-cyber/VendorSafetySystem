@@ -550,6 +550,13 @@ nav {
   border: 1px dashed #52616D;
   padding: 18px;
   border-radius: 8px;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.upload-card:hover,
+.upload-card:focus-within {
+  border-color: var(--orange);
+  background: #1c2936;
 }
 
 .upload-card label {
@@ -565,12 +572,64 @@ nav {
   font-size: 10px;
 }
 
-.upload-card input {
+.upload-card input[type="file"] {
   display: block;
   width: 100%;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   margin-top: 12px;
+  cursor: pointer;
+}
+
+.file-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.file-preview-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #252F38;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+}
+
+.file-preview-item .file-name {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
+}
+
+.file-preview-item .file-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-preview-item .file-size {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.file-preview-item .file-remove-btn {
+  background: transparent;
+  border: none;
+  color: #FF8080;
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.file-preview-item .file-remove-btn:hover {
+  color: #FF4D4D;
 }
 
 .upload-full {
@@ -586,6 +645,38 @@ nav {
   .upload-full {
     grid-column: auto;
   }
+}
+
+.form-message {
+  transition: all 0.3s ease;
+  line-height: 1.5;
+}
+
+.form-message.success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #173B32;
+  color: #65D6A9;
+  border: 1px solid #20A477;
+}
+
+.form-message.error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #482A2A;
+  color: #FF9999;
+  border: 1px solid #D9534F;
+}
+
+.form-message.info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #1F384C;
+  color: #8CCBFF;
+  border: 1px solid #337AB7;
 }
 
 </style>

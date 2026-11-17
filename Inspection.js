@@ -66,18 +66,12 @@ function saveInspection(formData) {
 
     for (let i = 1; i < values.length; i++) {
       const rowDate = values[i][1];
-      const sameDate = rowDate instanceof Date
-        ? Utilities.formatDate(
-            rowDate,
-            "Asia/Bangkok",
-            "yyyy-MM-dd"
-          ) === dateText
-        : String(rowDate) === dateText;
+      const sameDate = formatDateText_(rowDate) === dateText;
 
       if (
-        String(values[i][0]) === companyName &&
+        String(values[i][0]).trim() === companyName &&
         sameDate &&
-        String(values[i][2]) === period
+        String(values[i][2]).trim() === period
       ) {
         targetRow = i + 1;
         break;
@@ -204,8 +198,12 @@ function saveInspection(formData) {
     return {
       success: true,
       message: targetRow > 0
-        ? "ปรับปรุงรายการตรวจและเพิ่มไฟล์แนบเรียบร้อยแล้ว"
-        : "บันทึกการตรวจเรียบร้อยแล้ว",
+        ? `ปรับปรุงข้อมูลการตรวจของ ${companyName} (${period}) เรียบร้อยแล้ว`
+        : `บันทึกการตรวจของ ${companyName} (${period}) เรียบร้อยแล้ว`,
+      isUpdate: targetRow > 0,
+      companyName: companyName,
+      period: period,
+      inspectionDate: dateText,
       fileCount: savedFiles.length
     };
 
@@ -217,7 +215,26 @@ function saveInspection(formData) {
 
 function parseLocalDate_(dateText) {
   const parts = dateText.split("-").map(Number);
-  return new Date(parts[0], parts[1] - 1, parts[2]);
+  // ตั้งเวลาไว้ที่ 12:00:00 เที่ยงวัน เพื่อป้องกัน Timezone Offset ข้ามวันเมื่อบันทึกลงชีต
+  return new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
+}
+
+
+function formatDateText_(val) {
+  if (!val) return "";
+  if (val instanceof Date) {
+    return Utilities.formatDate(val, "Asia/Bangkok", "yyyy-MM-dd");
+  }
+  const str = String(val).trim();
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    try {
+      return Utilities.formatDate(d, "Asia/Bangkok", "yyyy-MM-dd");
+    } catch (e) {
+      return str.substring(0, 10);
+    }
+  }
+  return str.substring(0, 10);
 }
 
 

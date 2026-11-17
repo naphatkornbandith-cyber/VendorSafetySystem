@@ -6,7 +6,6 @@ function showPage(page, button) {
     vendors: "Vendor Registration",
     inspection: "Safety Inspection",
     history: "Inspection History"
-    
   };
 
   document.getElementById("page-title").textContent =
@@ -21,15 +20,30 @@ function showPage(page, button) {
   if (page === "dashboard") {
     renderDashboard();
   } else if (page === "vendors") {
-  renderVendorPage();
-} else if (page === "inspection") {
-  renderInspectionPage();
-} else {
-  renderComingSoon(titles[page]);
+    renderVendorPage();
+  } else if (page === "inspection") {
+    renderInspectionPage();
+  } else {
+    renderComingSoon(titles[page]);
+  }
 }
+
+// Global state for selected files in inspection module
+window.inspectionFileState = {
+  Before: [],
+  After: [],
+  "Work Permit": []
+};
 
 function renderInspectionPage() {
   const content = document.getElementById("page-content");
+
+  // Reset file state on render
+  window.inspectionFileState = {
+    Before: [],
+    After: [],
+    "Work Permit": []
+  };
 
   content.innerHTML = `
     <div class="welcome">
@@ -105,7 +119,7 @@ function renderInspectionPage() {
 
         <div class="upload-section">
           <h3>Inspection Evidence</h3>
-          <p>แนบรูปภาพและเอกสารประกอบการตรวจสอบ</p>
+          <p>แนบรูปภาพและเอกสารประกอบการตรวจสอบ (รองรับการถ่ายภาพจากมือถือ)</p>
 
           <div class="upload-grid">
 
@@ -115,8 +129,9 @@ function renderInspectionPage() {
               <input type="file"
                 id="before-files"
                 data-file-type="Before"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,image/webp,image/*"
                 multiple>
+              <div id="before-preview" class="file-preview-list"></div>
             </div>
 
             <div class="upload-card">
@@ -125,8 +140,9 @@ function renderInspectionPage() {
               <input type="file"
                 id="after-files"
                 data-file-type="After"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,image/webp,image/*"
                 multiple>
+              <div id="after-preview" class="file-preview-list"></div>
             </div>
 
             <div class="upload-card upload-full">
@@ -137,13 +153,13 @@ function renderInspectionPage() {
                 data-file-type="Work Permit"
                 accept=".pdf,.doc,.docx,image/jpeg,image/png"
                 multiple>
+              <div id="permit-preview" class="file-preview-list"></div>
             </div>
 
           </div>
 
           <p class="field-hint">
-            รองรับ JPG, PNG, WEBP, PDF, DOC และ DOCX
-            ขนาดไม่เกิน 5 MB ต่อไฟล์
+            รองรับ JPG, PNG, WEBP, PDF, DOC และ DOCX ขนาดไม่เกิน 5 MB ต่อไฟล์
           </p>
         </div>
 
@@ -166,9 +182,77 @@ function renderInspectionPage() {
   document.getElementById("inspection-form")
     .addEventListener("submit", submitInspectionForm);
 
+  // Setup file input listeners
+  setupFileInputHandler("before-files", "Before", "before-preview");
+  setupFileInputHandler("after-files", "After", "after-preview");
+  setupFileInputHandler("permit-files", "Work Permit", "permit-preview");
+
   loadInspectionCompanies();
 }
 
+function setupFileInputHandler(inputId, fileType, previewId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  input.addEventListener("change", event => {
+    const files = Array.from(event.target.files);
+    const validFiles = [];
+
+    for (const file of files) {
+      if (file.size > 5 * 1024 * 1024) {
+        showInspectionMessage(`ไฟล์ ${file.name} มีขนาดเกิน 5 MB`, "error");
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    // Append to file state
+    window.inspectionFileState[fileType].push(...validFiles);
+    // Reset file input value so user can select same file again if needed
+    input.value = "";
+    renderFilePreview(fileType, previewId);
+  });
+}
+
+function renderFilePreview(fileType, previewId) {
+  const container = document.getElementById(previewId);
+  if (!container) return;
+
+  const files = window.inspectionFileState[fileType] || [];
+  if (files.length === 0) {
+    container.innerHTML = "";
+    return;
+  }
+
+  container.innerHTML = files.map((file, idx) => `
+    <div class="file-preview-item">
+      <div class="file-name" title="${escapeHtml(file.name)}">
+        📄 ${escapeHtml(file.name)}
+      </div>
+      <div class="file-meta">
+        <span class="file-size">${formatFileSize(file.size)}</span>
+        <button type="button" class="file-remove-btn"
+          onclick="removeInspectionFile('${fileType}', ${idx}, '${previewId}')"
+          title="Remove file">✕</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function removeInspectionFile(fileType, index, previewId) {
+  if (window.inspectionFileState[fileType]) {
+    window.inspectionFileState[fileType].splice(index, 1);
+    renderFilePreview(fileType, previewId);
+  }
+}
+
+function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return (bytes / Math.pow(k, i)).toFixed(1) + " " + sizes[i];
+}
 
 function setTodayForInspection() {
   const now = new Date();
@@ -178,14 +262,17 @@ function setTodayForInspection() {
     String(now.getDate()).padStart(2, "0")
   ].join("-");
 
-  document.getElementById("inspection-date").value = localDate;
+  const dateInput = document.getElementById("inspection-date");
+  if (dateInput) {
+    dateInput.value = localDate;
+  }
 }
-
 
 function loadInspectionCompanies() {
   google.script.run
     .withSuccessHandler(vendors => {
       const select = document.getElementById("inspection-company");
+      if (!select) return;
 
       select.innerHTML = `
         <option value="">Select Company</option>
@@ -209,15 +296,16 @@ function loadInspectionCompanies() {
     .getInspectionFormData();
 }
 
-
 function showSelectedVendor() {
-  const companyName =
-    document.getElementById("inspection-company").value;
+  const companySelect = document.getElementById("inspection-company");
+  if (!companySelect) return;
+  const companyName = companySelect.value;
 
   const vendor = (window.inspectionVendors || [])
     .find(item => item.companyName === companyName);
 
   const info = document.getElementById("vendor-info");
+  if (!info) return;
 
   if (!vendor) {
     info.innerHTML = "กรุณาเลือกบริษัท";
@@ -228,12 +316,14 @@ function showSelectedVendor() {
     <div><strong>Work Location:</strong>
       ${escapeHtml(vendor.workLocation)}</div>
     <div><strong>Work Types:</strong>
-      ${(vendor.workTypes || []).map(type =>
-        `<span class="type-tag">${escapeHtml(type)}</span>`
-      ).join(" ")}</div>
+      ${(vendor.workTypes && vendor.workTypes.length > 0)
+        ? vendor.workTypes.map(type =>
+            `<span class="type-tag">${escapeHtml(type)}</span>`
+          ).join(" ")
+        : '<span style="color:var(--muted)">ไม่มีประเภทงานที่ระบุ</span>'}
+    </div>
   `;
 }
-
 
 function readInspectionFile(file, fileType) {
   return new Promise((resolve, reject) => {
@@ -247,7 +337,7 @@ function readInspectionFile(file, fileType) {
     reader.onload = () => {
       resolve({
         name: file.name,
-        mimeType: file.type,
+        mimeType: file.type || "application/octet-stream",
         fileType: fileType,
         data: reader.result
       });
@@ -261,104 +351,89 @@ function readInspectionFile(file, fileType) {
   });
 }
 
-
 async function submitInspectionForm(event) {
   event.preventDefault();
 
-  const button =
-    document.getElementById("save-inspection-button");
+  const button = document.getElementById("save-inspection-button");
+  const checkIn = document.getElementById("check-in").value;
+  const checkOut = document.getElementById("check-out").value;
+
+  // Validate check-in and check-out consistency
+  if (checkIn && checkOut && checkOut < checkIn) {
+    showInspectionMessage("เวลาตรวจออก (Check-out) ต้องไม่เกิดขึ้นก่อนเวลาเข้าตรวจ (Check-in)", "error");
+    return;
+  }
 
   button.disabled = true;
-  button.textContent = "Saving...";
+  button.textContent = "กำลังประมวลผลและอ่านไฟล์...";
 
   try {
     const files = [];
+    const fileTypes = ["Before", "After", "Work Permit"];
 
-    const fileGroups = [
-      { id: "before-files", type: "Before" },
-      { id: "after-files", type: "After" },
-      { id: "permit-files", type: "Work Permit" }
-    ];
-
-    for (const group of fileGroups) {
-      const selected = Array.from(
-        document.getElementById(group.id).files
-      );
-
+    for (const type of fileTypes) {
+      const selected = window.inspectionFileState[type] || [];
       for (const file of selected) {
-        files.push(
-          await readInspectionFile(file, group.type)
-        );
+        files.push(await readInspectionFile(file, type));
       }
     }
 
+    button.textContent = "กำลังบันทึกข้อมูลและอัปโหลดหลักฐาน...";
+
     const formData = {
-      companyName:
-        document.getElementById("inspection-company").value,
-
-      inspectionDate:
-        document.getElementById("inspection-date").value,
-
-      period:
-        document.getElementById("inspection-period").value,
-
-      checkIn:
-        document.getElementById("check-in").value,
-
-      checkOut:
-        document.getElementById("check-out").value,
-
-      result:
-        document.getElementById("inspection-result").value,
-
-      remarks:
-        document.getElementById("inspection-remarks").value,
-
+      companyName: document.getElementById("inspection-company").value,
+      inspectionDate: document.getElementById("inspection-date").value,
+      period: document.getElementById("inspection-period").value,
+      checkIn: checkIn,
+      checkOut: checkOut,
+      result: document.getElementById("inspection-result").value,
+      remarks: document.getElementById("inspection-remarks").value,
       files: files
     };
 
     google.script.run
       .withSuccessHandler(result => {
-        showInspectionMessage(
-          result.message + " แนบไฟล์ " + result.fileCount + " ไฟล์",
-          "success"
-        );
+        const fileInfo = result.fileCount > 0 ? ` (แนบไฟล์ ${result.fileCount} ไฟล์)` : "";
+        showInspectionMessage(`✔ ${result.message}${fileInfo}`, "success");
 
         document.getElementById("inspection-form").reset();
+        window.inspectionFileState = {
+          Before: [],
+          After: [],
+          "Work Permit": []
+        };
+        renderFilePreview("Before", "before-preview");
+        renderFilePreview("After", "after-preview");
+        renderFilePreview("Work Permit", "permit-preview");
+
         setTodayForInspection();
 
-        document.getElementById("vendor-info").innerHTML =
-          "กรุณาเลือกบริษัท";
+        document.getElementById("vendor-info").innerHTML = "กรุณาเลือกบริษัท";
 
         button.disabled = false;
         button.textContent = "Save Inspection";
       })
       .withFailureHandler(error => {
-        showInspectionMessage(error.message, "error");
+        showInspectionMessage(`⚠ ${error.message}`, "error");
         button.disabled = false;
         button.textContent = "Save Inspection";
       })
       .saveInspection(formData);
 
   } catch (error) {
-    showInspectionMessage(error.message, "error");
+    showInspectionMessage(`⚠ ${error.message}`, "error");
     button.disabled = false;
     button.textContent = "Save Inspection";
   }
 }
 
-
 function showInspectionMessage(message, type) {
   const box = document.getElementById("inspection-message");
-
   if (!box) return;
 
   box.textContent = message;
   box.className = "form-message " + type;
-}
-
-    renderComingSoon(titles[page]);
-  }
+  box.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 
