@@ -169,15 +169,15 @@ function renderDashboard() {
     </div>
 
     <div class="kpi-grid">
+      <div class="kpi-card" style="border-left: 3px solid #20A477;">
+        <span>${currentLang === 'th' ? 'ผู้รับเหมาในทะเบียน' : 'REGISTERED VENDORS'}</span>
+        <h2 id="kpi-registered-vendors" style="color: #48C798;">-</h2>
+        <small>${currentLang === 'th' ? 'บริษัททั้งหมดในระบบ' : 'Total active companies'}</small>
+      </div>
       <div class="kpi-card">
         <span>${t("kpi_companies")}</span>
         <h2 id="kpi-companies">-</h2>
-        <small>${currentLang === 'th' ? 'บริษัทที่ผ่านการตรวจวันนี้' : 'Companies today'}</small>
-      </div>
-      <div class="kpi-card">
-        <span>${t("kpi_total")}</span>
-        <h2 id="kpi-total">-</h2>
-        <small>${currentLang === 'th' ? 'บันทึกการตรวจทั้งหมด' : 'Total records'}</small>
+        <small>${currentLang === 'th' ? 'บริษัทที่ตรวจแล้ววันนี้' : 'Inspected today'}</small>
       </div>
       <div class="kpi-card">
         <span>${t("kpi_morning")}</span>
@@ -218,8 +218,10 @@ function renderDashboard() {
 function loadDashboardData(dateStr) {
   google.script.run
     .withSuccessHandler(data => {
+      const regEl = document.getElementById("kpi-registered-vendors");
+      if (regEl) regEl.textContent = data.totalRegisteredVendors ?? "-";
+
       document.getElementById("kpi-companies").textContent = data.companiesInspected;
-      document.getElementById("kpi-total").textContent = data.totalInspections;
       document.getElementById("kpi-morning").textContent = data.morningCount;
       document.getElementById("kpi-afternoon").textContent = data.afternoonCount;
 
@@ -229,7 +231,10 @@ function loadDashboardData(dateStr) {
           <div class="empty-state">
             <div class="empty-icon">▤</div>
             <h3>${t("no_data")}</h3>
-            <p>${currentLang === 'th' ? 'ยังไม่มีรายการตรวจในวันที่เลือก' : 'No records for this date.'}</p>
+            <p>${currentLang === 'th' ? `พบผู้รับเหมาในระบบ ${data.totalRegisteredVendors || 0} ราย แต่ยังไม่มีการตรวจความปลอดภัยในวันที่เลือก` : `Found ${data.totalRegisteredVendors || 0} registered vendors, but no inspections on this date.`}</p>
+            <button class="primary-button" style="margin-top:14px; padding:10px 20px;" onclick="showPage('inspection')">
+              + ${currentLang === 'th' ? 'ไปที่หน้าบันทึกการตรวจ' : 'Go to Safety Inspection'}
+            </button>
           </div>
         `;
         return;

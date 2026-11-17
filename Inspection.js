@@ -248,6 +248,9 @@ function safeFolderName_(name) {
 function getDashboardData(dateText) {
   const targetDate = dateText || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd");
   const inspections = getSheetRecords_("Inspections");
+  const vendors = getSheetRecords_("Vendors");
+
+  const totalRegisteredVendors = vendors.filter(v => v.Is_Active !== false).length;
 
   const dailyRecords = inspections.filter(item => {
     return formatDateText_(item.Inspection_Date) === targetDate;
@@ -262,6 +265,7 @@ function getDashboardData(dateText) {
 
   return {
     targetDate: targetDate,
+    totalRegisteredVendors: totalRegisteredVendors,
     totalInspections: dailyRecords.length,
     companiesInspected: uniqueCompanies,
     morningCount: morningCount,
